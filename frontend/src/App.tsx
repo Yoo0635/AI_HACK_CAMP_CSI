@@ -82,7 +82,7 @@ function isFullAlertMessage(data: AlertWsMessage): data is FullAlertWsMessage {
   );
 }
 
-const ALERT_THRESHOLD = 0.7;
+const ALERT_THRESHOLD = 80;
 const ALERT_HISTORY_SIZE = 10;
 const ADMIN_PASSWORD = "admin";
 
