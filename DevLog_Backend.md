@@ -30,3 +30,4 @@
 **16시**
 - risk_score_scure_service 
 - analysis result service에 risk score 암호화, 압축 연동
+- SLLM Worker
