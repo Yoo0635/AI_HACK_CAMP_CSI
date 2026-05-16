@@ -4,7 +4,6 @@ import Sidebar from "./components/Sidebar";
 import BedCard from "./components/BedCard";
 import StatsOverview from "./components/StatsOverview";
 
-// BedCard에서 사용할 데이터 타입 정의
 export interface BedData {
   bed_id: string;
   nickname: string;
@@ -12,8 +11,8 @@ export interface BedData {
   node_id?: string;
 }
 
-// UI 테스트를 위한 가짜 병상 데이터 리스트
-const MOCK_BEDS: BedData[] = [
+// 초기 데이터
+const INITIAL_BEDS: BedData[] = [
   { bed_id: "BED-101", nickname: "김환자", age: 65, node_id: "node_001" },
   { bed_id: "BED-102", nickname: "이환자", age: 72, node_id: "node_002" },
   { bed_id: "BED-103", nickname: "박환자", age: 58, node_id: "node_003" },
@@ -27,30 +26,47 @@ function App() {
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
 
-  // 통계 수치 테스트용 데이터 세팅
-  const totalBeds = MOCK_BEDS.length;
-  const warningCount = 1; // UI 테스트를 위해 위험 감지 건수를 1로 설정
+  // 병상 리스트를 State로 관리하여 추가/삭제가 화면에 즉각 반영되도록 변경
+  const [beds, setBeds] = useState<BedData[]>(INITIAL_BEDS);
+
+  // 🌟 신규 병상 등록 폼의 입력값을 관리하는 State
+  const [newBed, setNewBed] = useState<BedData>({
+    bed_id: "",
+    nickname: "",
+    age: 0,
+    node_id: "",
+  });
+
+  // 통계 수치 동기화
+  const totalBeds = beds.length;
+  const warningCount = 1;
   const normalCount = totalBeds - warningCount;
 
-  // 새로고침 동작 테스트
   const handleFetchBeds = () => {
     setIsRefreshing(true);
-    console.log("🔄 [테스트] 백엔드 데이터 새로고침 요청됨");
-
     setTimeout(() => {
       setIsRefreshing(false);
       setLastUpdated(new Date().toLocaleTimeString());
     }, 1000);
   };
 
-  // 침대 추가 동작 테스트
-  const handleAddBed = () => {
-    console.log("➕ [테스트] 침대 추가 모달 열기 요청됨");
-    setIsModalOpen(true);
+  // 폼 제출 시 실행되는 함수: 새로운 병상을 배열에 추가하고 모달을 닫음
+  const handleAddBedSubmit = (e: React.FormEvent) => {
+    e.preventDefault(); // 페이지 새로고침 방지
+
+    setBeds([...beds, newBed]); // 기존 배열에 새 데이터 추가
+    setIsModalOpen(false); // 모달 닫기
+
+    // 폼 초기화
+    setNewBed({
+      bed_id: "",
+      nickname: "",
+      age: 0,
+      node_id: "",
+    });
   };
 
   return (
-    // 전체 화면을 Flex로 좌우 분할
     <div className="flex h-screen bg-[#0B0E14] text-white font-sans overflow-hidden">
       <Sidebar />
 
@@ -59,10 +75,9 @@ function App() {
           lastUpdated={lastUpdated}
           isRefreshing={isRefreshing}
           onFetchBeds={handleFetchBeds}
-          onAddBed={handleAddBed}
+          onAddBed={() => setIsModalOpen(true)}
         />
 
-        {/* 헤더와 메인 병상 리스트 사이에 StatsOverview 배치 */}
         <StatsOverview
           totalBeds={totalBeds}
           normalCount={normalCount}
@@ -71,26 +86,99 @@ function App() {
 
         <main className="flex-1">
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6">
-            {MOCK_BEDS.map((bed) => (
-              <BedCard key={bed.bed_id} bed={bed} />
+            {beds.map((bed, index) => (
+              <BedCard key={`${bed.bed_id}-${index}`} bed={bed} />
             ))}
           </div>
         </main>
       </div>
 
+      {/* 병상 등록 폼 모달 */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 animate-fadeIn">
           <div className="bg-[#151821] border border-gray-700 rounded-2xl w-full max-w-md p-6 shadow-2xl">
-            <h2 className="text-xl font-bold mb-4 text-green-400">
-              신규 병상 등록
+            <h2 className="text-xl font-bold mb-6 text-white">
+              🛏️ 신규 병상 등록
             </h2>
-            <p className="text-gray-400 text-sm mb-6">침대 등록 구현 미완성</p>
-            <button
-              onClick={() => setIsModalOpen(false)}
-              className="w-full px-4 py-2 bg-green-500 text-black font-bold rounded-lg hover:bg-green-400 transition"
-            >
-              닫기
-            </button>
+
+            <form onSubmit={handleAddBedSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">
+                  병상 번호 (예: BED-105)
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newBed.bed_id}
+                  onChange={(e) =>
+                    setNewBed({ ...newBed, bed_id: e.target.value })
+                  }
+                  className="w-full bg-[#0B0E14] border border-gray-700 rounded-lg px-4 py-2 text-white focus:border-green-500 outline-none transition"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">
+                  환자 닉네임
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newBed.nickname}
+                  onChange={(e) =>
+                    setNewBed({ ...newBed, nickname: e.target.value })
+                  }
+                  className="w-full bg-[#0B0E14] border border-gray-700 rounded-lg px-4 py-2 text-white focus:border-green-500 outline-none transition"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">
+                    나이
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min="0"
+                    value={newBed.age || ""}
+                    onChange={(e) =>
+                      setNewBed({ ...newBed, age: Number(e.target.value) })
+                    }
+                    className="w-full bg-[#0B0E14] border border-gray-700 rounded-lg px-4 py-2 text-white focus:border-green-500 outline-none transition"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">
+                    노드 ID (선택)
+                  </label>
+                  <input
+                    type="text"
+                    value={newBed.node_id}
+                    onChange={(e) =>
+                      setNewBed({ ...newBed, node_id: e.target.value })
+                    }
+                    className="w-full bg-[#0B0E14] border border-gray-700 rounded-lg px-4 py-2 text-white focus:border-green-500 outline-none transition"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-8 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="flex-1 px-4 py-2 bg-gray-800 text-white rounded-lg font-bold hover:bg-gray-700 transition"
+                >
+                  취소
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-2 bg-green-500 text-black font-bold rounded-lg hover:bg-green-400 transition"
+                >
+                  등록하기
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
