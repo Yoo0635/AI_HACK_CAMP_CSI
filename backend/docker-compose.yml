@@ -76,6 +76,7 @@ services:
       ANALYSIS_STREAM: csi_analysis_stream
       TFLITE_MODEL_PATH: /app/models/activity_cnn_int8.tflite
       GGUF_MODEL_PATH: /app/models/sllm_model.gguf
+      PYTHONUNBUFFERED: "1"
     depends_on:
       redis:
         condition: service_healthy
