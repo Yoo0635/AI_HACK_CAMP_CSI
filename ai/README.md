@@ -155,7 +155,7 @@ ai/
 | `REDIS_HOST` | `localhost` | Redis 서버 주소 |
 | `REDIS_PORT` | `6379` | Redis 포트 |
 | `CSI_STREAM_NAME` | `csi_log_stream` | 입력 스트림 키 |
-| `CSI_RESULT_STREAM` | `csi_analysis_stream` | 출력 스트림 키 |
+| `ANALYSIS_STREAM` | `csi_analysis_stream` | 출력 스트림 키 |
 | `TFLITE_MODEL_PATH` | `models/activity_cnn_int8.tflite` | TFLite 모델 경로 |
 | `GGUF_MODEL_PATH` | `models/sllm_model.gguf` | sLLM 모델 경로 |
 
@@ -274,9 +274,15 @@ mv models/EXAONE-3.5-2.4B-Instruct-Q4_K_M.gguf models/sllm_model.gguf
 - `summarize(label, cnn_score, risk_score, energy)` → 한국어 2문장 요약
 - 프롬프트: 감지 상태·신뢰도·위험지수·에너지 → temperature=0.3, max_tokens=128
 
+**Worker 구현 및 config 정리**
+
+- `src/worker.py` 구현 완료 — Redis 스트림 구독, 필드 파싱, orchestrator 호출
+  - `data[b"node_id"]`, `data[b"seq_num"]`, `data[b"csi_matrix"]` 추출 후 `process(node_id, seq_num, csi_matrix)` 전달
+- `src/config.py` 정리 — `REDIS_URL`/`CSI_STREAM`/`RISK_THRESHOLD` 제거, orchestrator와 동일하게 `REDIS_HOST`/`REDIS_PORT`/`CSI_STREAM_NAME` 직접 사용
+
 ---
 
 ## 다음 작업
 
-- [ ] `src/worker.py` — Redis 데몬 구현 (CNN 메인스레드 + LLM 데몬스레드)
+- [x] `src/worker.py` — Redis 데몬 구현
 - [ ] `tools/test_local.py` — 로컬 추론 테스트

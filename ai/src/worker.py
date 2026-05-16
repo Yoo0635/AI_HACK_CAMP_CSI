@@ -2,24 +2,28 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(__file__))
 
+import json
 import redis
-from config import REDIS_URL, CSI_STREAM
+from config import REDIS_HOST, REDIS_PORT, CSI_STREAM_NAME
 from core.orchestrator import Orchestrator
 
 
 def main():
-    r = redis.from_url(REDIS_URL)
+    r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT)
     orchestrator = Orchestrator()
     last_id = "$"
 
-    print(f"worker started — listening on {CSI_STREAM}")
+    print(f"worker started — listening on {CSI_STREAM_NAME}")
     while True:
-        entries = r.xread({CSI_STREAM: last_id}, block=1000, count=10)
+        entries = r.xread({CSI_STREAM_NAME: last_id}, block=1000, count=10)
         if not entries:
             continue
         for _, messages in entries:
             for msg_id, data in messages:
-                orchestrator.process(data)
+                node_id = data[b"node_id"].decode()
+                seq_num = int(data[b"seq_num"])
+                csi_matrix = json.loads(data[b"csi_matrix"])
+                orchestrator.process(node_id, seq_num, csi_matrix)
                 last_id = msg_id
 
 

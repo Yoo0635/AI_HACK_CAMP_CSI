@@ -9,6 +9,3 @@ CSI_STREAM_NAME = os.getenv("CSI_STREAM_NAME", "csi_log_stream")
 ANALYSIS_STREAM = os.getenv("ANALYSIS_STREAM", "csi_analysis_stream")
 TFLITE_MODEL_PATH = os.getenv("TFLITE_MODEL_PATH", "models/activity_cnn_int8.tflite")
 GGUF_MODEL_PATH = os.getenv("GGUF_MODEL_PATH", "models/sllm_model.gguf")
-RISK_THRESHOLD = float(os.getenv("RISK_THRESHOLD", "0.7"))
-REDIS_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}"
-CSI_STREAM = CSI_STREAM_NAME

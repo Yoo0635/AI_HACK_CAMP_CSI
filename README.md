@@ -95,11 +95,20 @@ Docker Desktop 서비스가 중지돼 있어 `docker-compose up -d --build`로 �
 | `firmware/include/csi_collector.h` | `CSI_MAX_LEN 128`로 백엔드 기대값(64)과 불일치 | `CSI_MAX_LEN 64`로 수정 |
 | `firmware/src/main.cpp` | JSON 전송 — 백엔드는 280바이트 바이너리만 수신 가능 | 바이너리 `BinaryPacket` 구조체 전송으로 교체 |
 
+**AI Worker 버그 수정 및 config 정리:**
+
+| 위치 | 버그 | 수정 내용 |
+|------|------|---------|
+| `ai/src/worker.py` | `orchestrator.process(data)` — `seq_num`, `csi_matrix` 인자 누락 | 스트림 필드 파싱 후 `process(node_id, seq_num, csi_matrix)` 호출로 수정 |
+| `ai/src/config.py` | `REDIS_URL`, `CSI_STREAM`, `RISK_THRESHOLD` 중복·미사용 변수 | 제거 — `orchestrator.py`와 동일하게 `REDIS_HOST`/`REDIS_PORT`/`CSI_STREAM_NAME` 직접 사용 |
+| `ai/src/worker.py` | `redis.from_url(REDIS_URL)` — orchestrator.py와 방식 불일치 | `redis.Redis(host=REDIS_HOST, port=REDIS_PORT)`로 통일 |
+
 ---
 
 ## 다음 작업
 
 - [x] `docker-compose up` 백엔드 정상 기동 확인
+- [x] AI worker config/orchestrator 인터페이스 정합성 수정
 - [ ] 펌웨어 `pio run -t upload` 후 시리얼 `[OK]` 로그 확인
 - [ ] ESP32 연결 및 `csi_log_stream` 수신 확인 (`redis-cli XLEN csi_log_stream`)
 - [ ] 현장 데이터 수집 (NORMAL / MOVE / FALL)
