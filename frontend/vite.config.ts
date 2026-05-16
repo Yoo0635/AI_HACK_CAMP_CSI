@@ -19,6 +19,11 @@ export default defineConfig(({ mode }: { mode: string }) => {
           changeOrigin: true,
           rewrite: (path: string) => path.replace(/^\/api/, ""),
         },
+        "/ws": {
+          target: env.VITE_BACKEND_URL?.replace("http", "ws") || "ws://app:8000",
+          ws: true,
+          changeOrigin: true,
+        },
       },
     },
   };

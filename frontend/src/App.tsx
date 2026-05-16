@@ -266,7 +266,7 @@ function App() {
   };
 
   useEffect(() => {
-    const alertWs = new WebSocket("ws://localhost:8000/ws/alert");
+    const alertWs = new WebSocket(`ws://${window.location.host}/ws/alert`);
 
     alertWs.onopen = () => {
       console.log("🚨 전체 알람 웹소켓 연결됨!");
@@ -388,7 +388,7 @@ function App() {
     setIsRefreshing(true);
 
     try {
-      const response = await fetch("http://localhost:8000/beds");
+      const response = await fetch("/api/beds");
 
       if (response.ok) {
         const data: unknown = await response.json();
@@ -461,7 +461,7 @@ function App() {
     }
 
     try {
-      const response = await fetch("http://localhost:8000/beds", {
+      const response = await fetch("/api/beds", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(requestBody),

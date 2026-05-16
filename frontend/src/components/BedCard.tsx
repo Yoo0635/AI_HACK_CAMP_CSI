@@ -46,7 +46,7 @@ const BedCard = ({ bed }: BedCardProps) => {
       return;
     }
 
-    const socket = new WebSocket(`ws://localhost:8000/ws/csi/${activeNodeId}`);
+    const socket = new WebSocket(`ws://${window.location.host}/ws/csi/${activeNodeId}`);
     wsRef.current = socket;
 
     socket.onopen = () => {
@@ -129,7 +129,7 @@ const BedCard = ({ bed }: BedCardProps) => {
       console.log("현재 카드 node_id:", activeNodeId);
       console.log("전송 파일 크기:", arrayBuffer.byteLength);
 
-      const apiRes = await fetch("http://localhost:8000/csi/raw", {
+      const apiRes = await fetch("/api/csi/raw", {
         method: "POST",
         headers: { "Content-Type": "application/octet-stream" },
         body: arrayBuffer,
