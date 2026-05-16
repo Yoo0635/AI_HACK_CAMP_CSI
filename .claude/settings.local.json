@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "PowerShell(docker exec csi-redis-server redis-cli XLEN CsiLogStream)",
-      "PowerShell(docker exec csi-redis-server redis-cli XLEN csi_log_stream)"
+      "PowerShell(docker exec csi-redis-server redis-cli XLEN csi_log_stream)",
+      "Bash(git add *)"
     ]
   }
 }
