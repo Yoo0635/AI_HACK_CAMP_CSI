@@ -61,9 +61,28 @@ services:
       context: ./frontend
     ports:
       - "5173:5173"
+    restart: always
+    depends_on:
+      - app
     volumes:
       - ./frontend:/app
       - /app/node_modules
+
+  ai:
+    build:
+      context: ./ai
+      dockerfile: Dockerfile
+    image: csi-ai-worker
+    container_name: csi-ai-worker
+    restart: always
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./ai:/app
 
 volumes:
   db_data:
