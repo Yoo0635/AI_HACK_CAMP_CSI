@@ -276,7 +276,13 @@ mv models/EXAONE-3.5-2.4B-Instruct-Q4_K_M.gguf models/sllm_model.gguf
 
 ---
 
+**20:40** — `src/worker.py` 구현 완료
+- CNN 메인 루프: `csi_log_stream` xread → `orchestrator.process()`
+- LLM 데몬 스레드: `csi_analysis_stream` xread → `is_anomaly==true` 시 `summary_engine.summarize()` → xadd
+- LLM 스레드는 `daemon=True`로 CNN 루프 종료 시 자동 종료
+
+---
+
 ## 다음 작업
 
-- [ ] `src/worker.py` — Redis 데몬 구현 (CNN 메인스레드 + LLM 데몬스레드)
 - [ ] `tools/test_local.py` — 로컬 추론 테스트
