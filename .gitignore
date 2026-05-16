@@ -32,9 +32,6 @@ venv/
 node_modules/
 frontend/node_modules/
 .vite/
-<<<<<<< HEAD
-dist/
-=======
 dist/
 
 # 파이썬 캐시, 가상환경 무시
@@ -42,4 +39,3 @@ __pycache__/
 *.pyc
 .venv/
 venv/
->>>>>>> 902d203465c361c0bcef30dc6537ae861f1366a4
