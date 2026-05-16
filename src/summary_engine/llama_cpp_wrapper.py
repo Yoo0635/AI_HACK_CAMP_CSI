@@ -1,4 +1,8 @@
-from llama_cpp import Llama
+try:
+    from llama_cpp import Llama
+    _LLAMA_AVAILABLE = True
+except ModuleNotFoundError:
+    _LLAMA_AVAILABLE = False
 
 from config import GGUF_MODEL_PATH
 
@@ -15,12 +19,16 @@ PROMPT_TEMPLATE = """당신은 병원 병동의 환자 모니터링 AI입니다.
 
 class SummaryEngine:
     def __init__(self):
-        self._llm = Llama(
-            model_path=GGUF_MODEL_PATH,
-            n_ctx=512,
-            n_threads=4,
-            verbose=False,
-        )
+        if _LLAMA_AVAILABLE:
+            self._llm = Llama(
+                model_path=GGUF_MODEL_PATH,
+                n_ctx=512,
+                n_threads=4,
+                verbose=False,
+            )
+        else:
+            self._llm = None
+            print("[LLM] llama_cpp 없음 — 더미 요약 모드로 동작")
 
     def summarize(
         self,
@@ -29,6 +37,9 @@ class SummaryEngine:
         risk_score: float,
         energy: float,
     ) -> str:
+        if self._llm is None:
+            return f"[더미] {label} 감지 (score={cnn_score:.1%}, risk={risk_score:.1f})"
+
         prompt = PROMPT_TEMPLATE.format(
             label=label,
             cnn_score=cnn_score,

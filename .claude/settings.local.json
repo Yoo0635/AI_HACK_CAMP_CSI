@@ -3,7 +3,11 @@
     "allow": [
       "Read(//d/CSI/backend//**)",
       "Read(//d/CSI/develop//**)",
-      "PowerShell(docker exec csi-redis-server redis-cli XRANGE csi_log_stream - + COUNT 5)"
+      "PowerShell(docker exec csi-redis-server redis-cli XRANGE csi_log_stream - + COUNT 5)",
+      "Read(//d/CSI/firmware/**)",
+      "PowerShell(diff \\(Get-Content D:\\\\CSI\\\\ai\\\\src\\\\summary_engine\\\\llama_cpp_wrapper.py\\) \\(Get-Content D:\\\\CSI\\\\deploy\\\\ai\\\\src\\\\summary_engine\\\\llama_cpp_wrapper.py\\))",
+      "Read(//d/CSI/deploy/ai/src/activity_engine/**)",
+      "Read(//d/CSI/deploy/ai/**)"
     ]
   }
 }
