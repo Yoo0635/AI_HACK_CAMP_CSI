@@ -26,3 +26,5 @@
 **15시**
 - CNN Worker, CNN Analysis Model 생성
 - Gorilla 압축, Fernet 암호화
+
+**16시**
