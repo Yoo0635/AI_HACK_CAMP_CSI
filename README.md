@@ -88,8 +88,14 @@ firmware/
 
 ---
 
+**12:45** — `src/main.cpp` 완성 (Step 2 완료)
+- WiFi 연결 및 자동 재연결 로직
+- 50ms 간격 타이밍 제어 (초당 20패킷)
+- CSI 패킷 → JSON 직렬화 → HTTP POST
+
+---
+
 ## 다음 작업
 
-- [ ] Step 2: `main.cpp` 완성 — WiFi 연결 후 50ms POST 루프
 - [ ] Step 3: `config.h` 실제 값 입력
 - [ ] Step 4: 빌드 테스트 (`pio run`)
