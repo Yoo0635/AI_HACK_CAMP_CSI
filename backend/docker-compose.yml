@@ -82,6 +82,7 @@ services:
         condition: service_healthy
     volumes:
       - ../ai/models:/app/models
+      - ../ai/data:/app/data
 
 volumes:
   db_data:
