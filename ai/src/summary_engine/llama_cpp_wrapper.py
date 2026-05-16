@@ -23,7 +23,7 @@ class SummaryEngine:
     def __init__(self):
         self._llm = Llama(
             model_path=GGUF_MODEL_PATH,
-            n_ctx=512,
+            n_ctx=1024,
             n_threads=4,
             verbose=False,
         )
