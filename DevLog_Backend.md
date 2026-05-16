@@ -32,3 +32,4 @@
 - analysis result service에 risk score 암호화, 압축 연동
 - SLLM Worker 생성
 - WebSocket /ws/csi/{node_id} (service-DTO-controller)
+- WebSocket /ws/alert (service-DTO-controller)
