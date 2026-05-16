@@ -1,73 +1,30 @@
-# React + TypeScript + Vite
+# 🛏️ 실시간 환자 모니터링 대시보드 (AI HACK CAMP)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## 1. 개요
 
-Currently, two official plugins are available:
+본 프로젝트는 AI HACK CAMP 해커톤 출품작으로, 와이파이 채널 상태 정보(CSI) 데이터를 활용하여 환자의 이상 행동(낙상, 이탈 등)을 실시간으로 감지하고 모니터링하는 웹 대시보드입니다. 병동 관리자(의료진)가 직관적으로 환자의 상태와 위험도를 파악하고 눈의 피로를 줄일 수 있도록 다크모드 기반의 UI를 제공합니다.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 2. 설명
 
-## React Compiler
+### 🛠 기술 스택
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **Frontend:** React (Vite), TypeScript, Tailwind CSS v4, React-Icons
 
-## Expanding the ESLint configuration
+### 주요 기능
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- **실시간 웹소켓 통신:** 백엔드 서버와 연결되어 각 병상(Node)의 Risk Score(위험도 점수)를 지연 없이 수신합니다.
+- **동적 위험도 그래프:** 시간에 따른 환자의 상태 변화를 SVG 기반의 꺾은선 그래프로 시각화합니다.
+- **직관적인 UI/UX:** 위험 수치(0.7 이상) 도달 시 화면이 붉은색으로 점멸하며 즉각적인 경고를 보냅니다.
+- **병상 관리 인터페이스:** 환자 검색, 새로운 병상 추가 및 실시간 데이터 새로고침 기능을 제공합니다.
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## 개발로그
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+13:00 react 필요 UI 요소 설치
+13:32 해더 제작
+14:00 사이드바 제작
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+## 🎯 4. 다음 작업 (Next Steps)
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+- [ ] **`BedCard` 컴포넌트 이식:** 실시간 데이터 수신용 웹소켓(`ws://`) 및 테스트 패킷 전송(`POST /csi/raw`) 로직 구현
+- [ ] **글로벌 상태 관리 연동:** 위험 발생 시 대시보드 전체에 알림(Toast/Alert)을 띄우는 시스템 구축
+- [ ] 백엔드 AI 모델 분석 결과(CSI_ANALYSIS_NAME)와 프론트엔드 UI 최종 연동 테스트
