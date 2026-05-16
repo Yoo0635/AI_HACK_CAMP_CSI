@@ -36,8 +36,12 @@ def create_sllm_summary(fields: dict) -> str:
     )
 
 
+COOLDOWN_SEC = 120
+
+
 def run_sllm_worker() -> None:
     last_id = "$"
+    last_summary_time: dict[str, float] = {}
 
     while True:
         try:
@@ -59,6 +63,18 @@ def run_sllm_worker() -> None:
 
         for stream_name, messages in stream_data:
             for message_id, fields in messages:
+                is_anomaly = str(fields.get("is_anomaly", "false")).lower() == "true"
+                if not is_anomaly:
+                    last_id = message_id
+                    continue
+
+                node_id = str(fields.get("node_id", ""))
+                now = time.time()
+                if now - last_summary_time.get(node_id, 0) < COOLDOWN_SEC:
+                    last_id = message_id
+                    continue
+                last_summary_time[node_id] = now
+
                 try:
                     logger.info(
                         "SLLM worker 수신 message_id=%s node_id=%s label=%s risk_score=%s energy=%s is_anomaly=%s",
