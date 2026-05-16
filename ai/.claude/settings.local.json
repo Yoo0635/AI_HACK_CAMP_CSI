@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Read(//d/CSI/backend//**)",
-      "Read(//d/CSI/develop//**)"
+      "Read(//d/CSI/develop//**)",
+      "PowerShell(docker exec csi-redis-server redis-cli XRANGE csi_log_stream - + COUNT 5)"
     ]
   }
 }

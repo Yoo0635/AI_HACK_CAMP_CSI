@@ -159,6 +159,28 @@ ai/
 | `TFLITE_MODEL_PATH` | `models/activity_cnn_int8.tflite` | TFLite 모델 경로 |
 | `GGUF_MODEL_PATH` | `models/sllm_model.gguf` | sLLM 모델 경로 |
 
+### 데이터 수집
+
+먼저 실행 → 그 다음 동작 재현 (수집기가 돌아가는 동안 행동):
+
+```bash
+python tools/data_collector.py --label NORMAL --duration 3
+python tools/data_collector.py --label MOVE   --duration 3
+python tools/data_collector.py --label FALL   --duration 3
+```
+
+#### 학습 목표 샘플 수
+
+3초 수집 1회 = 약 60개 raw 샘플 (20패킷/초 × 3초)
+
+| 클래스 | 최소 수집 횟수 | 목표 샘플 수 | 비고 |
+|--------|--------------|-------------|------|
+| NORMAL | 50회 이상 | 3,000개+ | 정지 상태 다양한 자세 |
+| MOVE | 50회 이상 | 3,000개+ | 뒤척임·움직임 반복 |
+| FALL | 30회 이상 | 1,800개+ | 침대 이탈 동작 반복 재현 |
+
+> 현장 환경이 바뀌면 반드시 해당 환경에서 재수집 후 재학습 — CSI 패턴은 센서 위치·공간 구조에 따라 크게 달라짐
+
 sLLM 모델 다운로드:
 
 ```bash
@@ -200,27 +222,61 @@ mv models/EXAONE-3.5-2.4B-Instruct-Q4_K_M.gguf models/sllm_model.gguf
 - `--duration` 초 동안 `csi_log_stream` 구독 후 `.npy` 저장
 - 파일명: `{LABEL}_{timestamp}_{n}samples.npy`
 
-### 2026-05-16 (오후)
+**15:30** — 버그 수정
+- `src/config.py`: `REDIS_URL` → `REDIS_HOST` / `REDIS_PORT` 분리, 스트림명 `CsiLogStream` → `csi_log_stream` 수정
+- `tools/data_collector.py`: `xread count=10` → `count=100` (수집 누락 방지)
 
-**15:30** — `src/config.py` 버그 수정 및 `tools/data_collector.py` 호환성 수정
+**16:00~19:00** — 현장 학습 데이터 수집 완료
+- NORMAL: 3,669개 (목표 3,000 달성)
+- MOVE: 3,255개 (목표 3,000 달성)
+- FALL: 1,806개 (목표 1,800 달성)
 
-**문제 1**: `data_collector.py`가 `config.py`에 없는 변수(`REDIS_HOST`, `REDIS_PORT`, `CSI_STREAM_NAME`)를 import해 `ImportError` 발생
+**19:00** — `tools/train.py` 구현 완료
+- 파일 단위 슬라이딩 윈도우(20프레임) 생성
+- 서브캐리어 32 DC null 선형 보간 (`arr[:, 32] = (arr[:, 31] + arr[:, 33]) / 2.0`)
+- amplitude + Doppler 2채널 전처리 → (N, 20, 64, 2)
+- Conv2D×2 → LSTM(64) → Dense(3) softmax 모델
+- 클래스 불균형 가중치 자동 적용 (compute_class_weight)
+- TFLite INT8 양자화 변환 → `models/activity_cnn_int8.tflite`
 
-**문제 2**: `config.py`의 `CSI_STREAM` 기본값이 `"CsiLogStream"`이었으나 백엔드(`redis_streams.py`)가 쓰는 실제 스트림명은 `"csi_log_stream"`으로 불일치 → Redis에서 데이터를 읽지 못함
+**19:40** — 학습 중 과적합 발견 및 데이터 분할·모델 수정
+- 문제 1: 윈도우 단위 random split → 인접 윈도우(19프레임 겹침)가 train/val 양쪽에 분포 → val_accuracy 허위 100%
+- 문제 2: 파일 단위 분할 시 NORMAL 파일 2개뿐 → 실제 과적합 확인 (val 22%까지 하락)
+- 수정 1: 청크(150프레임) 단위 분할 → 파일 수가 적어도 다양한 분할 가능
+- 수정 2: 모델 정규화 강화 — Conv 필터 32→16/64→32, LSTM 64→32, Dropout 추가, L2 정규화 적용
+- 결과: val_accuracy 99.77% (에폭 9, EarlyStopping)
 
-**문제 3**: `data_collector.py`의 한글 출력에 em dash(`—`) 문자 포함 → Windows cp949 콘솔에서 `UnicodeEncodeError` 발생
+**20:00** — TFLite 변환 오류 수정 및 학습 완료
+- 오류: `LSTM`의 내부 루프(`TensorListReserve`)가 TFLite 빌트인 미지원
+- 수정: `LSTM(32, unroll=True)` — 루프를 20단계 정적으로 펼쳐 TFLite 호환
+- 최종 결과: val_accuracy 100%, val_loss 0.0241 (에폭 13, EarlyStopping)
+- TFLite INT8 변환 완료: `models/activity_cnn_int8.tflite` (171.9 KB)
 
-변경 내용:
-- `src/config.py` — `REDIS_HOST`, `REDIS_PORT` 환경변수 항목 추가; `CSI_STREAM_NAME` alias 추가; 스트림 기본값 `"CsiLogStream"` → `"csi_log_stream"` 수정
-- `tools/data_collector.py` — em dash(`—`) → 하이픈(`-`) 교체 (Windows 콘솔 호환)
+**20:10** — `src/activity_engine/model_engine.py` 구현 완료
+- TFLite 모델 로드 및 추론 (`tflite_runtime`)
+- `predict(window)` → `(label, confidence, energy)` 반환
+- energy: amplitude 채널 평균 제곱값 (위험도 보정용)
+
+**20:15**— `src/core/risk_scoring.py` 구현 완료
+- `risk_score = 기본점수 × confidence + 에너지 보정 (최대 15점)`
+- `is_anomaly = risk_score > 43`
+- 기본점수: NORMAL 20 / MOVE 65 / FALL 85 (상수로 분리, 테스트 후 조정 가능)
+
+**20:20** — `src/core/orchestrator.py` 구현 완료
+- `process(node_id, seq_num, csi_matrix)` → Preprocessor → ActivityEngine → compute_risk → xadd
+- 윈도우 미달 시 False 반환 (20프레임 쌓일 때까지 스킵)
+- `csi_analysis_stream` xadd (maxlen=600)
+
+---
+
+**20:30** — `src/summary_engine/llama_cpp_wrapper.py` 구현 완료
+- EXAONE GGUF 모델 로드 (`llama_cpp`, n_ctx=512, n_threads=4)
+- `summarize(label, cnn_score, risk_score, energy)` → 한국어 2문장 요약
+- 프롬프트: 감지 상태·신뢰도·위험지수·에너지 → temperature=0.3, max_tokens=128
 
 ---
 
 ## 다음 작업
 
-- [ ] `src/activity_engine/model_engine.py` — TFLite 추론 구현
-- [ ] `src/core/risk_scoring.py` — 위험도 산출 로직 구현
-- [ ] `src/summary_engine/llama_cpp_wrapper.py` — sLLM 래퍼 구현
-- [ ] `src/core/orchestrator.py` — 파이프라인 조율 구현
 - [ ] `src/worker.py` — Redis 데몬 구현 (CNN 메인스레드 + LLM 데몬스레드)
 - [ ] `tools/test_local.py` — 로컬 추론 테스트
