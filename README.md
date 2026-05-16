@@ -170,7 +170,6 @@ bash models/download_models.sh
 
 ## 다음 작업
 
-- [x] 파일 구조대로 스켈레톤 생성
 - [ ] `src/config.py` — .env 로드 및 전역 설정 구현
 - [ ] `src/activity_engine/preprocessing.py` — 슬라이딩 윈도우 구현
 - [ ] `src/activity_engine/model_engine.py` — TFLite 추론 구현
