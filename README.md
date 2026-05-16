@@ -326,9 +326,10 @@ mv models/EXAONE-3.5-2.4B-Instruct-Q4_K_M.gguf models/sllm_model.gguf
 | 1차 | 0.3 | 5.0 | 6.0 | 100% | 84.3% | 84.4% | FALL 오탐 다수 |
 | 2차 | 0.2 | 4.0 | 9.0 | — | — | — | FALL 오탐 과다 |
 | 3차 | 0.3 | 4.0 | 6.0 | 100% | 87.1% | 100% | val_acc 94.98% |
-| 최종 | 0.3 | 4.0 | 6.0 | **100%** | **100%** | **98.4%** | 새 NORMAL 데이터 재학습 |
+| 4차 | 0.3 | 4.0 | 6.0 | **100%** | **100%** | **98.4%** | 새 NORMAL 데이터 재학습 |
+| 최종 | 0.3 | 5.0 | 6.0 | **100%** | **100%** | **99.5%** | NORMAL 19파일 6237 samples |
 
-> 최종 학습 (2026-05-17): val_accuracy 0.9980, 14 에폭(EarlyStopping), 171.9 KB
+> 최종 학습 (2026-05-17): val_accuracy 0.9994, 20 에폭(EarlyStopping), 171.9 KB — NORMAL 19파일 6237 samples
 
 **도메인 과적합 이슈 파악 및 대응**
 - 현상: val_accuracy 99%+이지만 실제 환경에서 NORMAL을 MOVE/FALL로 오분류
@@ -340,5 +341,6 @@ mv models/EXAONE-3.5-2.4B-Instruct-Q4_K_M.gguf models/sllm_model.gguf
 
 ## 다음 작업
 
-- [ ] Pi에 새 모델 배포 후 실환경 테스트 (`scp` → `docker compose restart ai-worker`)
-- [ ] NORMAL 누운 자세 데이터 추가 수집 (오탐 개선 시 재학습)
+- [x] Pi에 새 모델 배포 완료 (`scp` → `docker compose restart ai-worker`)
+- [x] NORMAL 추가 수집 후 재학습 (19파일, 6237 samples)
+- [ ] 실환경 테스트 — 가만히 누웠을 때 NORMAL 안정적으로 나오는지 확인
