@@ -15,7 +15,7 @@ interface RiskScoreMessage {
 
 const GRAPH_HEIGHT = 20;
 const GRAPH_HISTORY_SIZE = 20;
-const ALERT_THRESHOLD = 0.7;
+const ALERT_THRESHOLD = 80.1;
 
 function normalizeRiskScore(score: number) {
   return Math.max(0, score);
@@ -219,7 +219,7 @@ const BedCard = ({ bed }: BedCardProps) => {
             </span>
 
             <span className="text-[10px] text-gray-500 mt-1">
-              0.7이상 : 위험
+              80.1이상 : 위험
             </span>
           </div>
 
