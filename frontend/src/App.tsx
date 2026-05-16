@@ -58,7 +58,10 @@ interface DangerLogEntry {
   cnn_timestamp: string;
   logged_at: string;
   sllm_summary: string;
+  nursing_note: string;
 }
+
+type LogModalMode = "admin" | "nursing";
 
 function isBedsApiResponse(data: unknown): data is BedsApiResponse {
   return typeof data === "object" && data !== null && "beds" in data;
@@ -83,8 +86,6 @@ const ALERT_THRESHOLD = 0.7;
 const ALERT_HISTORY_SIZE = 10;
 const ADMIN_PASSWORD = "admin";
 
-// 1 이상도 허용.
-// 음수만 0으로 보정.
 function normalizeRiskScore(score: number) {
   return Math.max(0, score);
 }
@@ -124,12 +125,15 @@ function App() {
   });
 
   const [alertData, setAlertData] = useState<AlertData | null>(null);
-
   const [alertRiskHistory, setAlertRiskHistory] = useState<number[]>([]);
-
   const [dangerLogs, setDangerLogs] = useState<DangerLogEntry[]>([]);
 
+  const [nursingNoteDrafts, setNursingNoteDrafts] = useState<
+    Record<number, string>
+  >({});
+
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
+  const [logModalMode, setLogModalMode] = useState<LogModalMode>("admin");
   const [adminPassword, setAdminPassword] = useState("");
   const [isLogUnlocked, setIsLogUnlocked] = useState(false);
   const [passwordError, setPasswordError] = useState("");
@@ -169,6 +173,7 @@ function App() {
         cnn_timestamp: alertInfo.cnn_timestamp,
         logged_at: now.toLocaleString(),
         sllm_summary: alertInfo.sllm_summary,
+        nursing_note: "",
       };
 
       setDangerLogs((prev) => {
@@ -190,14 +195,24 @@ function App() {
   );
 
   const handleOpenLogModal = () => {
+    setLogModalMode("admin");
     setIsLogModalOpen(true);
     setAdminPassword("");
     setIsLogUnlocked(false);
     setPasswordError("");
   };
 
+  const handleOpenNursingJournal = () => {
+    setLogModalMode("nursing");
+    setIsLogModalOpen(true);
+    setAdminPassword("");
+    setIsLogUnlocked(true);
+    setPasswordError("");
+  };
+
   const handleCloseLogModal = () => {
     setIsLogModalOpen(false);
+    setLogModalMode("admin");
     setAdminPassword("");
     setIsLogUnlocked(false);
     setPasswordError("");
@@ -223,6 +238,31 @@ function App() {
     }
 
     setDangerLogs([]);
+    setNursingNoteDrafts({});
+  };
+
+  const handleNursingNoteChange = (logId: number, value: string) => {
+    setNursingNoteDrafts((prev) => ({
+      ...prev,
+      [logId]: value,
+    }));
+  };
+
+  const handleSaveNursingNote = (logId: number) => {
+    const note = nursingNoteDrafts[logId] ?? "";
+
+    setDangerLogs((prev) =>
+      prev.map((log) =>
+        log.id === logId
+          ? {
+              ...log,
+              nursing_note: note,
+            }
+          : log,
+      ),
+    );
+
+    alert("간호내용이 저장되었습니다.");
   };
 
   useEffect(() => {
@@ -274,9 +314,6 @@ function App() {
           lastAlertInfoRef.current = fullAlertData;
 
           if (!isDanger) {
-            console.log(
-              `✅ risk_score ${safeRiskScore} < ${ALERT_THRESHOLD}, 알림 팝업 표시 안 함`,
-            );
             return;
           }
 
@@ -306,9 +343,6 @@ function App() {
 
           if (prev) {
             if (!isDanger) {
-              console.log(
-                `✅ risk_score ${safeRiskScore} < ${ALERT_THRESHOLD}, 알림 팝업 닫기`,
-              );
               return null;
             }
 
@@ -323,15 +357,7 @@ function App() {
             return null;
           }
 
-          if (updatedAlertInfo) {
-            return updatedAlertInfo;
-          }
-
-          console.warn(
-            "risk_score는 위험 기준 이상이지만, 환자 상세 정보가 없어 팝업을 만들 수 없습니다.",
-          );
-
-          return null;
+          return updatedAlertInfo;
         });
       } catch (e) {
         console.error("알람 데이터 파싱 에러:", e);
@@ -367,15 +393,11 @@ function App() {
       if (response.ok) {
         const data: unknown = await response.json();
 
-        console.log("✅ 백엔드 /beds 원본 응답:", data);
-
         const rawBedList: RawBedData[] = Array.isArray(data)
           ? data
           : isBedsApiResponse(data)
             ? (data.beds ?? [])
             : [];
-
-        console.log("✅ /beds에서 꺼낸 rawBedList:", rawBedList);
 
         const normalizedBeds: BedData[] = rawBedList.map((bed) => ({
           id: bed.id,
@@ -385,8 +407,6 @@ function App() {
           age: Number(bed.age ?? 0),
           disease: bed.disease ?? "",
         }));
-
-        console.log("✅ 프론트에서 사용할 normalizedBeds:", normalizedBeds);
 
         setBeds(normalizedBeds);
         setLastUpdated(new Date().toLocaleTimeString());
@@ -425,8 +445,6 @@ function App() {
       disease: newBed.disease.trim(),
     };
 
-    console.log("🚀 침대 등록 요청 데이터:", requestBody);
-
     if (!requestBody.bed_id) {
       alert("병상 번호를 입력해주세요.");
       return;
@@ -448,11 +466,6 @@ function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(requestBody),
       });
-
-      const resultText = await response.text();
-
-      console.log("📦 침대 등록 응답 상태:", response.status);
-      console.log("📦 침대 등록 응답 내용:", resultText);
 
       if (response.ok) {
         alert("🎉 성공적으로 등록되었습니다!");
@@ -490,7 +503,7 @@ function App() {
 
       {isLogModalOpen && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[60] p-4">
-          <div className="bg-[#151821] border border-gray-700 rounded-2xl w-full max-w-4xl p-6 shadow-2xl relative">
+          <div className="bg-[#151821] border border-gray-700 rounded-2xl w-full max-w-6xl p-6 shadow-2xl relative">
             <button
               onClick={handleCloseLogModal}
               className="absolute top-4 right-4 text-gray-400 hover:text-white transition"
@@ -498,9 +511,14 @@ function App() {
               <FiX size={24} />
             </button>
 
-            <h2 className="text-xl font-bold mb-2">위험 로그 조회</h2>
+            <h2 className="text-xl font-bold mb-2">
+              {logModalMode === "nursing" ? "간호 일지" : "위험 로그 조회"}
+            </h2>
+
             <p className="text-sm text-gray-400 mb-6">
-              관리자만 열람 가능합니다.
+              {logModalMode === "nursing"
+                ? "Risk Score 0.7 이상 발생 시각, 환자 이름, LLM 결과값, 간호내용을 기록합니다."
+                : "관리자만 열람 가능합니다."}
             </p>
 
             {!isLogUnlocked ? (
@@ -540,12 +558,14 @@ function App() {
                     </span>
                   </p>
 
-                  <button
-                    onClick={handleClearDangerLogs}
-                    className="px-3 py-2 bg-gray-800 text-gray-300 text-sm rounded-lg hover:bg-red-500 hover:text-white transition"
-                  >
-                    로그 전체 삭제
-                  </button>
+                  {logModalMode === "admin" && (
+                    <button
+                      onClick={handleClearDangerLogs}
+                      className="px-3 py-2 bg-gray-800 text-gray-300 text-sm rounded-lg hover:bg-red-500 hover:text-white transition"
+                    >
+                      로그 전체 삭제
+                    </button>
+                  )}
                 </div>
 
                 {dangerLogs.length === 0 ? (
@@ -553,69 +573,108 @@ function App() {
                     아직 저장된 위험 로그가 없습니다.
                   </div>
                 ) : (
-                  <div className="max-h-[420px] overflow-y-auto overflow-x-auto rounded-xl border border-gray-700">
-                    <table className="w-full min-w-[980px] table-fixed text-sm">
+                  <div className="max-h-[480px] overflow-y-auto overflow-x-auto rounded-xl border border-gray-700">
+                    <table
+                      className={`w-full table-fixed text-sm ${
+                        logModalMode === "nursing"
+                          ? "min-w-[1100px]"
+                          : "min-w-[760px]"
+                      }`}
+                    >
                       <thead className="sticky top-0 bg-[#0B0E14] text-gray-400">
                         <tr>
-                          <th className="w-[190px] whitespace-nowrap break-keep text-left px-4 py-3">
-                            저장 시각
+                          <th className="w-[130px] text-left px-4 py-3">
+                            전송 시간
                           </th>
-                          <th className="w-[120px] whitespace-nowrap break-keep text-left px-4 py-3">
-                            신호 시각
+                          <th className="w-[90px] text-left px-4 py-3">병상</th>
+                          <th className="w-[100px] text-left px-4 py-3">
+                            환자 이름
                           </th>
-                          <th className="w-[90px] whitespace-nowrap break-keep text-left px-4 py-3">
-                            병상
+                          <th className="w-[80px] text-left px-4 py-3">Risk</th>
+                          <th className="w-[260px] text-left px-4 py-3">
+                            LLM 결과값
                           </th>
-                          <th className="w-[90px] whitespace-nowrap break-keep text-left px-4 py-3">
-                            환자
-                          </th>
-                          <th className="w-[80px] whitespace-nowrap break-keep text-left px-4 py-3">
-                            상태
-                          </th>
-                          <th className="w-[80px] whitespace-nowrap break-keep text-left px-4 py-3">
-                            Risk
-                          </th>
-                          <th className="whitespace-nowrap break-keep text-left px-4 py-3">
-                            AI 요약
-                          </th>
+
+                          {logModalMode === "nursing" && (
+                            <>
+                              <th className="w-[360px] text-left px-4 py-3">
+                                간호내용
+                              </th>
+                              <th className="w-[90px] text-left px-4 py-3">
+                                저장
+                              </th>
+                            </>
+                          )}
                         </tr>
                       </thead>
 
                       <tbody>
-                        {[...dangerLogs].reverse().map((log) => (
-                          <tr
-                            key={log.id}
-                            className="border-t border-gray-800 hover:bg-gray-800/40"
-                          >
-                            <td className="whitespace-nowrap break-keep px-4 py-3 text-gray-300">
-                              {log.logged_at}
-                            </td>
+                        {[...dangerLogs].reverse().map((log) => {
+                          const draftValue =
+                            nursingNoteDrafts[log.id] ?? log.nursing_note;
 
-                            <td className="whitespace-nowrap break-keep px-4 py-3 text-gray-300">
-                              {log.cnn_timestamp}
-                            </td>
+                          return (
+                            <tr
+                              key={log.id}
+                              className="border-t border-gray-800 hover:bg-gray-800/40 align-top"
+                            >
+                              <td className="px-4 py-3 text-gray-300">
+                                {log.cnn_timestamp}
+                              </td>
 
-                            <td className="whitespace-nowrap break-keep px-4 py-3 font-bold text-white">
-                              {log.bed_id}
-                            </td>
+                              <td className="px-4 py-3 font-bold text-white">
+                                {log.bed_id}
+                              </td>
 
-                            <td className="whitespace-nowrap break-keep px-4 py-3 text-gray-300">
-                              {log.nickname}
-                            </td>
+                              <td className="px-4 py-3 text-gray-300">
+                                {log.nickname}
+                              </td>
 
-                            <td className="whitespace-nowrap break-keep px-4 py-3 text-yellow-300">
-                              {"낙상"}
-                            </td>
+                              <td className="px-4 py-3 font-black text-red-400">
+                                {log.risk_score.toFixed(2)}
+                              </td>
 
-                            <td className="whitespace-nowrap break-keep px-4 py-3 font-black text-red-400">
-                              {log.risk_score.toFixed(2)}
-                            </td>
+                              <td className="px-4 py-3 text-gray-300 break-keep">
+                                {log.sllm_summary || "LLM 결과값 없음"}
+                              </td>
 
-                            <td className="break-keep px-4 py-3 text-gray-300">
-                              {log.sllm_summary}
-                            </td>
-                          </tr>
-                        ))}
+                              {logModalMode === "nursing" && (
+                                <>
+                                  <td className="px-4 py-3">
+                                    <textarea
+                                      value={draftValue}
+                                      onChange={(e) =>
+                                        handleNursingNoteChange(
+                                          log.id,
+                                          e.target.value,
+                                        )
+                                      }
+                                      placeholder="간호내용을 입력하세요."
+                                      className="w-full min-h-[80px] resize-y bg-[#0B0E14] border border-gray-700 rounded-lg px-3 py-2 text-gray-200 focus:border-green-500 outline-none"
+                                    />
+                                    {log.nursing_note && (
+                                      <p className="text-[11px] text-green-400 mt-1">
+                                        저장된 내용 있음
+                                      </p>
+                                    )}
+                                  </td>
+
+                                  <td className="px-4 py-3">
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        handleSaveNursingNote(log.id)
+                                      }
+                                      className="px-3 py-2 bg-green-500 text-black text-xs font-bold rounded-lg hover:bg-green-400 transition"
+                                    >
+                                      저장
+                                    </button>
+                                  </td>
+                                </>
+                              )}
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -626,7 +685,11 @@ function App() {
         </div>
       )}
 
-      <Sidebar onOpenLogs={handleOpenLogModal} logCount={dangerLogs.length} />
+      <Sidebar
+        onOpenLogs={handleOpenLogModal}
+        onOpenNursingJournal={handleOpenNursingJournal}
+        logCount={dangerLogs.length}
+      />
 
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header
@@ -668,7 +731,7 @@ function App() {
             <form onSubmit={handleAddBedSubmit} className="space-y-4">
               <div>
                 <label className="block text-xs text-gray-500 mb-1">
-                  병상 번호 (예: B-101)
+                  병상 번호
                 </label>
                 <input
                   value={newBed.bed_id}
@@ -682,7 +745,7 @@ function App() {
 
               <div>
                 <label className="block text-xs text-gray-500 mb-1">
-                  노드 ID (예: NODE01)
+                  노드 ID
                 </label>
                 <input
                   value={newBed.node_id}
@@ -693,9 +756,6 @@ function App() {
                   }
                   required
                 />
-                <p className="text-[11px] text-gray-500 mt-1">
-                  테스트 파일을 사용할 경우 node_id는 NODE01로 입력하세요.
-                </p>
               </div>
 
               <div>
@@ -713,35 +773,27 @@ function App() {
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">
-                    나이
-                  </label>
-                  <input
-                    type="number"
-                    value={newBed.age || ""}
-                    className="w-full bg-[#0B0E14] border border-gray-700 rounded-lg px-4 py-2 focus:border-green-500 outline-none"
-                    onChange={(e) =>
-                      setNewBed({
-                        ...newBed,
-                        age: parseInt(e.target.value) || 0,
-                      })
-                    }
-                  />
-                </div>
+                <input
+                  type="number"
+                  value={newBed.age || ""}
+                  placeholder="나이"
+                  className="w-full bg-[#0B0E14] border border-gray-700 rounded-lg px-4 py-2 focus:border-green-500 outline-none"
+                  onChange={(e) =>
+                    setNewBed({
+                      ...newBed,
+                      age: parseInt(e.target.value) || 0,
+                    })
+                  }
+                />
 
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">
-                    질환명
-                  </label>
-                  <input
-                    value={newBed.disease}
-                    className="w-full bg-[#0B0E14] border border-gray-700 rounded-lg px-4 py-2 focus:border-green-500 outline-none"
-                    onChange={(e) =>
-                      setNewBed({ ...newBed, disease: e.target.value })
-                    }
-                  />
-                </div>
+                <input
+                  value={newBed.disease}
+                  placeholder="질환명"
+                  className="w-full bg-[#0B0E14] border border-gray-700 rounded-lg px-4 py-2 focus:border-green-500 outline-none"
+                  onChange={(e) =>
+                    setNewBed({ ...newBed, disease: e.target.value })
+                  }
+                />
               </div>
 
               <div className="flex gap-3 mt-8">
