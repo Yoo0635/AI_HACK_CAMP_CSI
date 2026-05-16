@@ -297,9 +297,15 @@ function App() {
         }
 
         if (data.type === "SLLM_UPDATE" && typeof data.sllm_summary === "string") {
+          const summary = data.sllm_summary as string;
           setAlertData((prev: AlertData | null) =>
-            prev ? { ...prev, sllm_summary: data.sllm_summary as string } : prev,
+            prev ? { ...prev, sllm_summary: summary } : prev,
           );
+          setDangerLogs((prev: DangerLogEntry[]) => {
+            if (prev.length === 0) return prev;
+            const last = prev[prev.length - 1];
+            return [...prev.slice(0, -1), { ...last, sllm_summary: summary }];
+          });
           return;
         }
 
@@ -537,7 +543,7 @@ function App() {
 
             <p className="text-sm text-gray-400 mb-6">
               {logModalMode === "nursing"
-                ? "Risk Score 0.7 이상 발생 시각, 환자 이름, LLM 결과값, 간호내용을 기록합니다."
+                ? "Risk Score 80.1 이상 발생 시각, 환자 이름, LLM 결과값, 간호내용을 기록합니다."
                 : "관리자만 열람 가능합니다."}
             </p>
 
