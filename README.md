@@ -12,6 +12,6 @@
 - PostgreSQL Config 
 - Global Custom Exception Handler
 - POST /beds API (beds-service-DTO-controller)
-- GET /beds API
+- GET /beds API (beds-service-DTO-controller)
 
 
