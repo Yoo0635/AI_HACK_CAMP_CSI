@@ -140,6 +140,7 @@ function App() {
 
   const lastAlertInfoRef = useRef<AlertData | null>(null);
   const alertActiveRef = useRef(false);
+  const hasLoggedRef = useRef(false);
 
   const pushAlertRiskScore = useCallback((score: number) => {
     const safeScore = normalizeRiskScore(score);
@@ -152,6 +153,7 @@ function App() {
 
   const saveDangerLog = useCallback(
     (riskScore: number, alertInfo: AlertData | null) => {
+      if (hasLoggedRef.current) return;
       if (!alertInfo) {
         console.warn("위험 로그를 저장할 상세 환자 정보가 없습니다.");
         return;
@@ -162,6 +164,8 @@ function App() {
       if (safeScore < ALERT_THRESHOLD) {
         return;
       }
+
+      hasLoggedRef.current = true;
 
       const now = new Date();
 
@@ -292,6 +296,13 @@ function App() {
           return;
         }
 
+        if (data.type === "SLLM_UPDATE" && typeof data.sllm_summary === "string") {
+          setAlertData((prev: AlertData | null) =>
+            prev ? { ...prev, sllm_summary: data.sllm_summary as string } : prev,
+          );
+          return;
+        }
+
         if (alertActiveRef.current) {
           return;
         }
@@ -328,7 +339,7 @@ function App() {
           return;
         }
 
-        setAlertData((prev) => {
+        setAlertData((prev: AlertData | null) => {
           const storedAlertInfo = lastAlertInfoRef.current;
 
           const updatedAlertInfo = storedAlertInfo
@@ -348,10 +359,8 @@ function App() {
           }
 
           if (prev) {
-            if (!isDanger) {
-              return null;
-            }
-
+            // 팝업이 이미 열려있으면 위험도 무관하게 닫지 않음
+            alertActiveRef.current = true;
             return {
               ...prev,
               risk_score: safeRiskScore,
@@ -363,6 +372,7 @@ function App() {
             return null;
           }
 
+          alertActiveRef.current = true;
           return updatedAlertInfo;
         });
       } catch (e) {
@@ -505,6 +515,7 @@ function App() {
           historySize={ALERT_HISTORY_SIZE}
           onClose={() => {
             alertActiveRef.current = false;
+            hasLoggedRef.current = false;
             setAlertData(null);
           }}
         />

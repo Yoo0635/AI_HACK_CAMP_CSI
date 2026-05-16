@@ -87,6 +87,17 @@ async def stream_alert(
             for message_id, fields in stream_messages:
                 last_id = message_id
 
+                # sllm_summary 전용 메시지 (AI sllm 스레드가 xadd)
+                if "sllm_summary" in fields and "risk_score" not in fields:
+                    if alert_started:
+                        sllm_summary = str(fields.get("sllm_summary", ""))
+                        if sllm_summary:
+                            await ws.send_json({
+                                "type": "SLLM_UPDATE",
+                                "sllm_summary": sllm_summary,
+                            })
+                    continue
+
                 try:
                     risk_score = float(fields["risk_score"])
                     is_anomaly = str(fields["is_anomaly"]).lower() == "true"
