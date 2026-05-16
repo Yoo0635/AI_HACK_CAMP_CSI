@@ -20,6 +20,7 @@ static void wifi_connect() {
 
 void setup() {
     Serial.begin(115200);
+    delay(3000);  // USB CDC 열거 대기
     wifi_connect();
     csi_collector_init();  // WiFi 연결 후 CSI 활성화
 }

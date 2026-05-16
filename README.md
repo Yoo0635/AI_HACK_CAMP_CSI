@@ -116,8 +116,14 @@ firmware/
 
 ---
 
+**13:10** — 플래싱 및 Serial 모니터 동작 확인 (Step 5, 6 완료)
+- `pio run --target upload` 플래싱 성공 (COM9, MAC: 1c:db:d4:47:12:d0)
+- USB CDC 활성화 (`-DARDUINO_USB_CDC_ON_BOOT=1`) 추가로 Serial 출력 정상화
+- WiFi 연결 확인, CSI 수집 및 HTTP POST 전송 동작 확인
+- `POST 404` — FastAPI `/csi/log` 엔드포인트 미구현 상태, 펌웨어 자체는 정상
+
+---
+
 ## 다음 작업
 
-- [ ] Step 5: 플래싱 (`pio run --target upload`)
-- [ ] Step 6: Serial 모니터 동작 확인 (`pio device monitor`)
-- [ ] Step 7: FastAPI 연동 테스트
+- [ ] Step 7: FastAPI `/csi/log` 엔드포인트 구현 후 연동 테스트 (백엔드 작업)
