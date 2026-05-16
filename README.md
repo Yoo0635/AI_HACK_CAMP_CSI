@@ -110,9 +110,14 @@ firmware/
 
 ---
 
+**13:00** — 빌드 테스트 (Step 4 완료)
+- `pio run` 컴파일 성공, 에러 없음
+- RAM 13.9% / Flash 27.7% 사용
+
+---
+
 ## 다음 작업
 
-- [ ] Step 4: 빌드 테스트 (`pio run`)
 - [ ] Step 5: 플래싱 (`pio run --target upload`)
 - [ ] Step 6: Serial 모니터 동작 확인 (`pio device monitor`)
 - [ ] Step 7: FastAPI 연동 테스트
