@@ -139,6 +139,7 @@ function App() {
   const [passwordError, setPasswordError] = useState("");
 
   const lastAlertInfoRef = useRef<AlertData | null>(null);
+  const alertActiveRef = useRef(false);
 
   const pushAlertRiskScore = useCallback((score: number) => {
     const safeScore = normalizeRiskScore(score);
@@ -291,6 +292,10 @@ function App() {
           return;
         }
 
+        if (alertActiveRef.current) {
+          return;
+        }
+
         const signalTime = formatSignalTime(data.cnn_timestamp);
 
         pushAlertRiskScore(riskScore);
@@ -318,6 +323,7 @@ function App() {
           }
 
           saveDangerLog(safeRiskScore, fullAlertData);
+          alertActiveRef.current = true;
           setAlertData(fullAlertData);
           return;
         }
@@ -497,7 +503,10 @@ function App() {
           data={alertData}
           riskHistory={alertRiskHistory}
           historySize={ALERT_HISTORY_SIZE}
-          onClose={() => setAlertData(null)}
+          onClose={() => {
+            alertActiveRef.current = false;
+            setAlertData(null);
+          }}
         />
       )}
 

@@ -17,7 +17,7 @@ interface AlertPopupProps {
   onClose: () => void;
 }
 
-const ALERT_THRESHOLD = 0.7;
+const ALERT_THRESHOLD = 80;
 const GRAPH_HEIGHT = 40;
 
 const normalizeRiskScore = (score: number) => {
