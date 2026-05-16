@@ -5,6 +5,8 @@
 #include "config.h"
 #include "csi_collector.h"
 
+#define LED_PIN 48
+
 static uint32_t seq_num    = 0;
 static uint32_t last_tx_ms = 0;
 
@@ -20,6 +22,8 @@ static void wifi_connect() {
 
 void setup() {
     Serial.begin(115200);
+    pinMode(LED_PIN, OUTPUT);
+    digitalWrite(LED_PIN, LOW);
     delay(3000);  // USB CDC 열거 대기
     wifi_connect();
     csi_collector_init();  // WiFi 연결 후 CSI 활성화
@@ -57,7 +61,9 @@ void loop() {
     HTTPClient http;
     http.begin(FASTAPI_URL);
     http.addHeader("Content-Type", "application/json");
+    digitalWrite(LED_PIN, HIGH);
     int code = http.POST(body);
+    digitalWrite(LED_PIN, LOW);
     if (code != 200) {
         Serial.printf("[WARN] POST %d  seq=%lu\n", code, seq_num - 1);
     }
