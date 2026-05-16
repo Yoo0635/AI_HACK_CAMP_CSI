@@ -5,10 +5,12 @@ from redis.exceptions import RedisError
 
 from backend.config.redis import redis_client
 from backend.config.redis_streams import CSI_ANALYSIS_NAME
-from backend.entities.bed import Bed
 from backend.entities.analysis_result import AnalysisResult
+from backend.entities.bed import Bed
 from backend.exceptions.custom_exception import BedNotFoundByNodeException
 from backend.repositories.analysis_result_repository import save_analysis_result
+from backend.utils.fernet_crypto import encrypt_bytes
+from backend.utils.gorilla_compressor import compress_risk_scores
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -45,11 +47,14 @@ def save_analysis_result_db(
         if risk_scores is None:
             risk_scores = [float(fields["risk_score"])]
 
+        compressed_bytes = compress_risk_scores(risk_scores)
+        secure_log = encrypt_bytes(compressed_bytes)
+
     try:
         analysis_result = save_analysis_result(
             db=db,
             bed_id=bed.id,
-            secure_log=risk_scores,
+            secure_log=secure_log,
             sllm_summary=sllm_summary,
             sllm_timestamp=sllm_timestamp,
         )
