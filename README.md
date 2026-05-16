@@ -222,13 +222,47 @@ mv models/EXAONE-3.5-2.4B-Instruct-Q4_K_M.gguf models/sllm_model.gguf
 - `--duration` 초 동안 `csi_log_stream` 구독 후 `.npy` 저장
 - 파일명: `{LABEL}_{timestamp}_{n}samples.npy`
 
+**15:30** — 버그 수정
+- `src/config.py`: `REDIS_URL` → `REDIS_HOST` / `REDIS_PORT` 분리, 스트림명 `CsiLogStream` → `csi_log_stream` 수정
+- `tools/data_collector.py`: `xread count=10` → `count=100` (수집 누락 방지)
+
+**16:00~19:00** — 현장 학습 데이터 수집 완료
+- NORMAL: 3,669개 (목표 3,000 달성)
+- MOVE: 3,255개 (목표 3,000 달성)
+- FALL: 1,806개 (목표 1,800 달성)
+
+**19:00** — `tools/train.py` 구현 완료
+- 파일 단위 슬라이딩 윈도우(20프레임) 생성
+- 서브캐리어 32 DC null 선형 보간 (`arr[:, 32] = (arr[:, 31] + arr[:, 33]) / 2.0`)
+- amplitude + Doppler 2채널 전처리 → (N, 20, 64, 2)
+- Conv2D×2 → LSTM(64) → Dense(3) softmax 모델
+- 클래스 불균형 가중치 자동 적용 (compute_class_weight)
+- TFLite INT8 양자화 변환 → `models/activity_cnn_int8.tflite`
+
+**19:40** — 학습 중 과적합 발견 및 데이터 분할·모델 수정
+- 문제 1: 윈도우 단위 random split → 인접 윈도우(19프레임 겹침)가 train/val 양쪽에 분포 → val_accuracy 허위 100%
+- 문제 2: 파일 단위 분할 시 NORMAL 파일 2개뿐 → 실제 과적합 확인 (val 22%까지 하락)
+- 수정 1: 청크(150프레임) 단위 분할 → 파일 수가 적어도 다양한 분할 가능
+- 수정 2: 모델 정규화 강화 — Conv 필터 32→16/64→32, LSTM 64→32, Dropout 추가, L2 정규화 적용
+- 결과: val_accuracy 99.77% (에폭 9, EarlyStopping)
+
+**20:00** — TFLite 변환 오류 수정 및 학습 완료
+- 오류: `LSTM`의 내부 루프(`TensorListReserve`)가 TFLite 빌트인 미지원
+- 수정: `LSTM(32, unroll=True)` — 루프를 20단계 정적으로 펼쳐 TFLite 호환
+- 최종 결과: val_accuracy 100%, val_loss 0.0241 (에폭 13, EarlyStopping)
+- TFLite INT8 변환 완료: `models/activity_cnn_int8.tflite` (171.9 KB)
+
+**20:10** — `src/activity_engine/model_engine.py` 구현 완료
+- TFLite 모델 로드 및 추론 (`tflite_runtime`)
+- `predict(window)` → `(label, confidence, energy)` 반환
+- energy: amplitude 채널 평균 제곱값 (위험도 보정용)
+
 ---
 
 ## 다음 작업
 
-- [ ] `src/activity_engine/model_engine.py` — TFLite 추론 구현
 - [ ] `src/core/risk_scoring.py` — 위험도 산출 로직 구현
-- [ ] `src/summary_engine/llama_cpp_wrapper.py` — sLLM 래퍼 구현
 - [ ] `src/core/orchestrator.py` — 파이프라인 조율 구현
+- [ ] `src/summary_engine/llama_cpp_wrapper.py` — sLLM 래퍼 구현
 - [ ] `src/worker.py` — Redis 데몬 구현 (CNN 메인스레드 + LLM 데몬스레드)
 - [ ] `tools/test_local.py` — 로컬 추론 테스트
