@@ -1,7 +1,8 @@
 import { useState } from "react";
 import Header from "./components/Header";
 import Sidebar from "./components/Sidebar";
-import BedCard from "./components/BedCard"; // 🌟 BedCard 컴포넌트 불러오기
+import BedCard from "./components/BedCard";
+import StatsOverview from "./components/StatsOverview";
 
 // BedCard에서 사용할 데이터 타입 정의
 export interface BedData {
@@ -25,6 +26,11 @@ function App() {
   );
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+
+  // 통계 수치 테스트용 데이터 세팅
+  const totalBeds = MOCK_BEDS.length;
+  const warningCount = 1; // UI 테스트를 위해 위험 감지 건수를 1로 설정
+  const normalCount = totalBeds - warningCount;
 
   // 새로고침 동작 테스트
   const handleFetchBeds = () => {
@@ -54,6 +60,13 @@ function App() {
           isRefreshing={isRefreshing}
           onFetchBeds={handleFetchBeds}
           onAddBed={handleAddBed}
+        />
+
+        {/* 헤더와 메인 병상 리스트 사이에 StatsOverview 배치 */}
+        <StatsOverview
+          totalBeds={totalBeds}
+          normalCount={normalCount}
+          warningCount={warningCount}
         />
 
         <main className="flex-1">
