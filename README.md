@@ -290,6 +290,55 @@ mv models/EXAONE-3.5-2.4B-Instruct-Q4_K_M.gguf models/sllm_model.gguf
 
 ---
 
+### 2026-05-17
+
+**Windows 호환성 수정 (`model_engine.py`, `llama_cpp_wrapper.py`)**
+- `tflite_runtime` Windows 미지원 → try/except로 `tensorflow.lite` fallback 추가
+- `llama_cpp` Windows 미설치 시 더미 모드로 폴백 (실제 추론 없이 레이블 반환)
+  - 더미 출력: `[더미] {label} 감지 (score={cnn_score:.1%}, risk={risk_score:.1f})`
+- 두 수정 모두 Pi 배포에는 영향 없음 (llama_cpp, tflite_runtime 정상 설치됨)
+
+**라즈베리파이 배포 완료**
+- SSH 설정: `csi@192.168.1.2` (SSH 키 등록으로 비밀번호 없이 접속)
+- `deploy/backend/docker-compose.yml`에 `ai-worker` 서비스 추가
+  - Redis healthcheck 의존, `../ai/models:/app/models` 볼륨 마운트
+- 기존 포트 충돌(6379) → 구 컨테이너 전부 정리 후 재기동
+- sLLM 모델 Pi에 직접 다운로드 (huggingface-cli, EXAONE Q4_K_M, ~1.7 GB)
+- Pi `~/csi/ai/data/` 권한 문제 (Docker가 root로 생성) → `chown -R csi:csi` 처리
+
+**데이터 추가 수집**
+- FALL·MOVE 현장 추가 수집 (Pi에서 `data_collector.py` 직접 실행)
+- NORMAL 파일 교체: 대용량 2개(1,222+2,447 samples) → 균일 크기 10개(각 ~455 samples)
+  - 파일 크기 편차 완화로 청크 분할 균형 개선
+
+**`tools/train.py` 개선**
+- `sklearn.metrics.confusion_matrix` 기반 클래스별 정확도·혼동 행렬 출력 추가
+- 수동 클래스 가중치 CLI 인자 추가: `--w_normal`, `--w_move`, `--w_fall`
+  - 미설정 시 `compute_class_weight("balanced", ...)` 자동 계산 유지
+
+**클래스 가중치 튜닝 이력**
+
+자동 가중치로 MOVE 25.6% → 수동 조정 반복:
+
+| 실험 | --w_normal | --w_move | --w_fall | NORMAL | MOVE | FALL | 비고 |
+|------|-----------|---------|---------|--------|------|------|------|
+| 자동 | (auto) | (auto) | (auto) | 100% | 25.6% | 100% | MOVE 미분류 |
+| 1차 | 0.3 | 5.0 | 6.0 | 100% | 84.3% | 84.4% | FALL 오탐 다수 |
+| 2차 | 0.2 | 4.0 | 9.0 | — | — | — | FALL 오탐 과다 |
+| 3차 | 0.3 | 4.0 | 6.0 | 100% | 87.1% | 100% | val_acc 94.98% |
+| 최종 | 0.3 | 4.0 | 6.0 | **100%** | **100%** | **98.4%** | 새 NORMAL 데이터 재학습 |
+
+> 최종 학습 (2026-05-17): val_accuracy 0.9980, 14 에폭(EarlyStopping), 171.9 KB
+
+**도메인 과적합 이슈 파악 및 대응**
+- 현상: val_accuracy 99%+이지만 실제 환경에서 NORMAL을 MOVE/FALL로 오분류
+- 원인: 센서 위치·공간 구조가 CSI 패턴을 결정 → 훈련 환경 특성을 모델이 암기
+- 대응: 동일 환경에서 NORMAL 추가 수집 → 현재 환경의 정지 CSI 패턴 반영
+- 근본 해결책: 배포 환경에서 데이터 재수집 후 재학습 필수
+
+---
+
 ## 다음 작업
 
-- [ ] 전체 파이프라인 통합 테스트 (ESP32 → FastAPI → Redis → AI Worker)
+- [ ] Pi에 새 모델 배포 후 실환경 테스트 (`scp` → `docker compose restart ai-worker`)
+- [ ] NORMAL 누운 자세 데이터 추가 수집 (오탐 개선 시 재학습)
