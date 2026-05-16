@@ -1,7 +1,7 @@
 # 개발 로그
 ## 2026-05-16
 
-**12시 이전**
+**11시**
 - .gitignore, .dockerignore 작성 docker-compose.yml에 redis, FastAPI, PostgreSQL 등록
 - Backend Directory Structure 생성
 - 가상환경에 pip install 완료 및 인터프리터 설정
@@ -13,5 +13,5 @@
 - Global Custom Exception Handler
 - POST /beds API (beds-service-DTO-controller)
 - GET /beds API (beds-service-DTO-controller)
-
+- Redis Config
 
