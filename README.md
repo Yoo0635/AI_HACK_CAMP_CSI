@@ -283,6 +283,13 @@ mv models/EXAONE-3.5-2.4B-Instruct-Q4_K_M.gguf models/sllm_model.gguf
 
 ---
 
+**21:00** — `tools/test_local.py` 구현 완료
+- `--mode pipeline`: Orchestrator 직접 호출 (Redis 없이 파이프라인 동작 확인)
+- `--mode inject`: Redis에 더미 CSI 프레임 주입
+- `--mode read`: `csi_analysis_stream` 최근 결과 출력
+
+---
+
 ## 다음 작업
 
-- [ ] `tools/test_local.py` — 로컬 추론 테스트
+- [ ] 전체 파이프라인 통합 테스트 (ESP32 → FastAPI → Redis → AI Worker)
