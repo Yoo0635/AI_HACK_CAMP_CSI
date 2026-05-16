@@ -18,5 +18,7 @@
 
 **14시**
 - redis async config, redis_stream name
-- POST /csi/raw (analysis_result-service-DTO-controller)
-- redis에 CSI 데이터 저장
+- POST /csi/raw (service-DTO-controller)
+- redis stream에 CSI 데이터 저장
+- redis stream에 CNN 분석 데이터 저장 창구 만들기 (service-DTO-CNN_worker)
+- PostgreSQL에 SLLM 분석 데이터 저장 창구 만들기 (repository-service-DTO-SLLM_worker)
