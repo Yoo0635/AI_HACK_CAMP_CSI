@@ -24,9 +24,6 @@ services:
     container_name: csi-redis-server
     restart: always
     command: redis-server --appendonly yes
-    environment:
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -64,6 +61,26 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
+
+  ai-worker:
+    build:
+      context: ../ai
+      dockerfile: Dockerfile
+    image: csi-ai-worker
+    container_name: csi-ai-worker
+    restart: always
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      CSI_STREAM_NAME: csi_log_stream
+      ANALYSIS_STREAM: csi_analysis_stream
+      TFLITE_MODEL_PATH: /app/models/activity_cnn_int8.tflite
+      GGUF_MODEL_PATH: /app/models/sllm_model.gguf
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ../ai/models:/app/models
 
 volumes:
   db_data:
