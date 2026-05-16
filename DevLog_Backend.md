@@ -12,8 +12,11 @@
 - PostgreSQL Config 
 - Global Custom Exception Handler
 - POST /beds API (beds-service-DTO-controller)
+- PostgreSQL에 bed 정보 저장
 - GET /beds API (beds-service-DTO-controller)
 - Redis Config
 
 **14시**
 - redis async config, redis_stream name
+- POST /csi/raw (analysis_result-service-DTO-controller)
+- redis에 CSI 데이터 저장
