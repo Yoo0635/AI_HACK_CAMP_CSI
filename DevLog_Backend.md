@@ -18,5 +18,18 @@
 
 **14시**
 - redis async config, redis_stream name
-- POST /csi/raw (analysis_result-service-DTO-controller)
-- redis에 CSI 데이터 저장
+- POST /csi/raw (service-DTO-controller)
+- redis stream에 CSI 데이터 저장
+- redis stream에 CNN 분석 데이터 저장 창구 만들기 (service-DTO-CNN_worker)
+- PostgreSQL에 SLLM 분석 데이터 저장 창구 만들기 (repository-service-DTO-SLLM_worker)
+
+**15시**
+- CNN Worker, CNN Analysis Model 생성
+- Gorilla 압축, Fernet 암호화
+
+**16시**
+- risk_score_scure_service 
+- analysis result service에 risk score 암호화, 압축 연동
+- SLLM Worker 생성
+- WebSocket /ws/csi/{node_id} (service-DTO-controller)
+- WebSocket /ws/alert (service-DTO-controller)
