@@ -257,11 +257,19 @@ mv models/EXAONE-3.5-2.4B-Instruct-Q4_K_M.gguf models/sllm_model.gguf
 - `predict(window)` → `(label, confidence, energy)` 반환
 - energy: amplitude 채널 평균 제곱값 (위험도 보정용)
 
+**20:15**— `src/core/risk_scoring.py` 구현 완료
+- `risk_score = 기본점수 × confidence + 에너지 보정 (최대 15점)`
+- `is_anomaly = risk_score > 43`
+- 기본점수: NORMAL 20 / MOVE 65 / FALL 85 (상수로 분리, 테스트 후 조정 가능)
+
 ---
 
 ## 다음 작업
 
-- [ ] `src/core/risk_scoring.py` — 위험도 산출 로직 구현
+- [ ] `src/core/orchestrator.py` — 파이프라인 조율 구현
+- [ ] `src/summary_engine/llama_cpp_wrapper.py` — sLLM 래퍼 구현
+- [ ] `src/worker.py` — Redis 데몬 구현 (CNN 메인스레드 + LLM 데몬스레드)
+- [ ] `tools/test_local.py` — 로컬 추론 테스트
 - [ ] `src/core/orchestrator.py` — 파이프라인 조율 구현
 - [ ] `src/summary_engine/llama_cpp_wrapper.py` — sLLM 래퍼 구현
 - [ ] `src/worker.py` — Redis 데몬 구현 (CNN 메인스레드 + LLM 데몬스레드)
