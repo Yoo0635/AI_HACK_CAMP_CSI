@@ -13,6 +13,7 @@ from config import REDIS_HOST, REDIS_PORT, CSI_STREAM_NAME
 LABELS = ("NORMAL", "MOVE", "FALL")
 
 
+
 def collect(label: str, duration: int, output_dir: str) -> None:
     r = redis.Redis(host=REDIS_HOST, port=int(REDIS_PORT))
     os.makedirs(output_dir, exist_ok=True)
@@ -21,14 +22,14 @@ def collect(label: str, duration: int, output_dir: str) -> None:
     last_id = "$"
     deadline = time.time() + duration
 
-    print(f"[{label}] 수집 시작 — {duration}초")
+    print(f"[{label}] 수집 중 — {duration}초")
 
     while time.time() < deadline:
         block_ms = min(int((deadline - time.time()) * 1000), 1000)
         if block_ms <= 0:
             break
 
-        entries = r.xread({CSI_STREAM_NAME: last_id}, block=block_ms, count=10)
+        entries = r.xread({CSI_STREAM_NAME: last_id}, block=block_ms, count=100)
         if not entries:
             continue
 
