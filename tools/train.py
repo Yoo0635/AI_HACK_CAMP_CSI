@@ -5,6 +5,7 @@ import sys
 
 import numpy as np
 from sklearn.utils.class_weight import compute_class_weight
+from sklearn.metrics import confusion_matrix
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 import tensorflow as tf
@@ -133,6 +134,9 @@ def main():
     parser.add_argument("--epochs", type=int, default=50)
     parser.add_argument("--batch_size", type=int, default=64)
     parser.add_argument("--val_ratio", type=float, default=0.2)
+    parser.add_argument("--w_normal", type=float, default=None, help="NORMAL 가중치 (미설정 시 자동)")
+    parser.add_argument("--w_move",   type=float, default=None, help="MOVE 가중치")
+    parser.add_argument("--w_fall",   type=float, default=None, help="FALL 가중치")
     args = parser.parse_args()
 
     print("=== 데이터 로딩 (파일 단위 분할) ===")
@@ -142,8 +146,11 @@ def main():
     X_train = preprocess(X_raw_tr)
     X_val   = preprocess(X_raw_val)
 
-    cw = compute_class_weight("balanced", classes=np.unique(y_train), y=y_train)
-    class_weight = {i: cw[i] for i in range(len(cw))}
+    if args.w_normal is not None:
+        class_weight = {0: args.w_normal, 1: args.w_move, 2: args.w_fall}
+    else:
+        cw = compute_class_weight("balanced", classes=np.unique(y_train), y=y_train)
+        class_weight = {i: cw[i] for i in range(len(cw))}
     print(f"클래스 가중치: {class_weight}")
 
     print("\n=== 모델 학습 ===")
@@ -166,6 +173,20 @@ def main():
 
     loss, acc = model.evaluate(X_val, y_val, verbose=0)
     print(f"\n검증 정확도: {acc:.4f}  손실: {loss:.4f}")
+
+    # 클래스별 정확도 및 혼동 행렬
+    y_pred = np.argmax(model.predict(X_val, verbose=0), axis=1)
+    cm = confusion_matrix(y_val, y_pred, labels=[0, 1, 2])
+    print("\n=== 클래스별 정확도 ===")
+    for i, label in enumerate(LABELS):
+        total = cm[i].sum()
+        correct = cm[i][i]
+        pct = correct / total * 100 if total > 0 else 0
+        print(f"  {label:6s}: {correct:4d}/{total:4d}  ({pct:.1f}%)")
+    print(f"\n혼동 행렬 (행=실제, 열=예측):")
+    print(f"{'':8s}" + "".join(f"{l:>8s}" for l in LABELS))
+    for i, label in enumerate(LABELS):
+        print(f"  {label:6s}" + "".join(f"{cm[i][j]:8d}" for j in range(len(LABELS))))
 
     print("\n=== TFLite INT8 변환 ===")
     os.makedirs(os.path.dirname(args.output), exist_ok=True)
