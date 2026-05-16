@@ -166,11 +166,14 @@ bash models/download_models.sh
 - CNN / sLLM 입출력 스키마 확정
 - git init, `ai` 브랜치 생성 및 GitHub push
 
+**13:50** — `src/config.py` 구현 완료
+- `.env` 로드 및 전역 설정 (REDIS_URL, 스트림 키 3종, 모델 경로, RISK_THRESHOLD)
+- `.env.example` 스트림 키 수정 (RESULT_STREAM → ANALYSIS_STREAM / ALERT_STREAM)
+
 ---
 
 ## 다음 작업
 
-- [ ] `src/config.py` — .env 로드 및 전역 설정 구현
 - [ ] `src/activity_engine/preprocessing.py` — 슬라이딩 윈도우 구현
 - [ ] `src/activity_engine/model_engine.py` — TFLite 추론 구현
 - [ ] `src/core/risk_scoring.py` — 위험도 산출 로직 구현
