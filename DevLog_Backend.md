@@ -28,3 +28,4 @@
 - Gorilla 압축, Fernet 암호화
 
 **16시**
+- risk_score_scure_service 
