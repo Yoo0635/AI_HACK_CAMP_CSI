@@ -10,7 +10,7 @@ from activity_engine.model_engine import ActivityEngine
 from core.risk_scoring import compute_risk
 
 SENSOR1_ID = "esp32s3-4712D0"   # CNN 추론 센서
-SENSOR2_ID = "esp32s3-4712D1"   # 낙상 검증 센서 (rule-based)
+SENSOR2_ID = "esp32s3-470CF8"   # 낙상 검증 센서 (rule-based)
 
 FALL_CONFIRM_WINDOW_SEC   = 5.0   # FALL 판정 시 D1에서 소급 확인할 시간(초)
 SENSOR2_MOVEMENT_THRESH   = 0.03  # D1 에너지 표준편차 임계값 (이 이상이면 움직임 있음)
@@ -70,14 +70,14 @@ class Orchestrator:
 
         label, confidence, energy = self._engine.predict(window)
 
-        # 두 센서 낙상 검증
-        fall_confirmed = True
+        # 두 센서 낙상 검증: D1이 움직임을 명시적으로 확인한 경우만 FALL 유지
+        fall_confirmed = False
         if label == "FALL":
-            sensor2_result = self._sensor2_had_movement()
-            if sensor2_result is False:
-                # D1에 데이터 있지만 움직임 없음 → 소파 눕기 오탐, 억제
+            if self._sensor2_had_movement() is True:
+                fall_confirmed = True
+            else:
+                # D1 미감지 또는 데이터 부족 → 억제
                 label = "NORMAL"
-                fall_confirmed = False
 
         risk_score, is_anomaly = compute_risk(label, confidence, energy)
 
