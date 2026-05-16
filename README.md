@@ -170,11 +170,16 @@ bash models/download_models.sh
 - `.env` 로드 및 전역 설정 (REDIS_URL, 스트림 키 3종, 모델 경로, RISK_THRESHOLD)
 - `.env.example` 스트림 키 수정 (RESULT_STREAM → ANALYSIS_STREAM / ALERT_STREAM)
 
+**14:10** — `src/activity_engine/preprocessing.py` 구현 완료
+- `deque(maxlen=20)` 슬라이딩 윈도우 버퍼
+- amplitude 채널: `clip(buf / 20.0, 0.0, 1.0)` → (20, 64)
+- Doppler 채널: `clip(diff / 5.0, -1.0, 1.0)` + 첫 프레임 zero 패딩 → (20, 64)
+- 모델 입력 shape: (1, 20, 64, 2)
+
 ---
 
 ## 다음 작업
 
-- [ ] `src/activity_engine/preprocessing.py` — 슬라이딩 윈도우 구현
 - [ ] `src/activity_engine/model_engine.py` — TFLite 추론 구현
 - [ ] `src/core/risk_scoring.py` — 위험도 산출 로직 구현
 - [ ] `src/summary_engine/llama_cpp_wrapper.py` — sLLM 래퍼 구현
