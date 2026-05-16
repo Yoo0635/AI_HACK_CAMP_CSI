@@ -11,6 +11,7 @@
 - .env, .env.docker 
 - PostgreSQL Config 
 - Global Custom Exception Handler
-
+- POST /beds API (beds-service-DTO-controller)
+- 
 
 
