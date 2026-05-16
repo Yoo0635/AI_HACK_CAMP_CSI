@@ -9,8 +9,8 @@ from activity_engine.preprocessing import Preprocessor
 from activity_engine.model_engine import ActivityEngine
 from core.risk_scoring import compute_risk
 
-SENSOR1_ID = "esp32s3-4712D0"   # CNN 추론 센서
-SENSOR2_ID = "esp32s3-470CF8"   # 낙상 검증 센서 (rule-based)
+SENSOR1_ID = "NODE001"   # CNN 추론 센서
+SENSOR2_ID = "NODE002"   # 낙상 검증 센서 (rule-based)
 
 FALL_CONFIRM_WINDOW_SEC   = 5.0   # FALL 판정 시 D1에서 소급 확인할 시간(초)
 SENSOR2_MOVEMENT_THRESH   = 0.03  # D1 에너지 표준편차 임계값 (이 이상이면 움직임 있음)
@@ -68,7 +68,7 @@ class Orchestrator:
         if window is None:
             return False
 
-        label, confidence, energy = self._engine.predict(window)
+        label, confidence, energy, probs = self._engine.predict(window)
 
         # 두 센서 낙상 검증: D1이 움직임을 명시적으로 확인한 경우만 FALL 유지
         fall_confirmed = False
@@ -76,11 +76,13 @@ class Orchestrator:
             if self._sensor2_had_movement() is True:
                 fall_confirmed = True
             else:
-                # D1 미감지 또는 데이터 부족 → 억제
-                label = "NORMAL"
+                # D1 미감지 또는 데이터 부족 → MOVE로 강제 재분류
+                label = "MOVE"
+                confidence = float(probs[1])
 
         risk_score, is_anomaly = compute_risk(label, confidence, energy)
 
+        s2_movement = self._sensor2_had_movement()
         self._r.xadd(
             ANALYSIS_STREAM,
             {
@@ -93,6 +95,8 @@ class Orchestrator:
                 "is_anomaly":     "true" if is_anomaly else "false",
                 "fall_confirmed": "true" if fall_confirmed else "false",
                 "cnn_timestamp":  int(time.time() * 1000),
+                "d1_movement":    "true" if s2_movement is True else ("false" if s2_movement is False else "none"),
+                "d1_history_len": len(self._sensor2_history),
             },
             maxlen=600,
         )

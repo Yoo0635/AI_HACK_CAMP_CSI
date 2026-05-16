@@ -18,10 +18,10 @@ class ActivityEngine:
         self._input_idx  = self._interpreter.get_input_details()[0]["index"]
         self._output_idx = self._interpreter.get_output_details()[0]["index"]
 
-    def predict(self, window: np.ndarray) -> tuple[str, float, float]:
+    def predict(self, window: np.ndarray) -> tuple[str, float, float, np.ndarray]:
         """
         window: (1, 20, 64, 2) float32
-        returns: (label, confidence, energy)
+        returns: (label, confidence, energy, probs)
         """
         self._interpreter.set_tensor(self._input_idx, window)
         self._interpreter.invoke()
@@ -31,4 +31,4 @@ class ActivityEngine:
         confidence = float(probs[cls_idx])
         energy = float(np.mean(window[0, :, :, 0] ** 2))
 
-        return LABELS[cls_idx], confidence, energy
+        return LABELS[cls_idx], confidence, energy, probs
