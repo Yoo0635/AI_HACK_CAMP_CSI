@@ -1,10 +1,16 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { FiSend } from "react-icons/fi";
 import { FaThermometerHalf, FaTint } from "react-icons/fa";
 import type { BedData } from "../App";
 
 interface BedCardProps {
   bed: BedData;
+}
+
+interface RiskScoreMessage {
+  type?: "RISK_SCORE";
+  node_id?: string;
+  risk_score: number | string;
 }
 
 const GRAPH_HEIGHT = 20;
@@ -23,22 +29,127 @@ const BedCard = ({ bed }: BedCardProps) => {
 
   const activeNodeId = bed.node_id;
 
-  // 그래프 UI 업데이트 함수
+  const wsRef = useRef<WebSocket | null>(null);
+
   const updateGraph = (score: number) => {
     const safeScore = normalizeRiskScore(score);
+
     setRiskScore(safeScore);
     setHistory((prev) => [...prev.slice(1), safeScore]);
   };
 
-  // 🌟 백엔드 통신 로직 제거 및 가짜 데이터 생성 로직으로 대체
-  const handleTestUI = () => {
-    // 0.0 ~ 1.0 사이의 랜덤한 수치를 만들어 그래프와 경고등 UI가 잘 작동하는지 확인합니다.
-    const randomScore = Math.random();
-    console.log(
-      `[${bed.bed_id}] 가짜 위험도 데이터 생성:`,
-      randomScore.toFixed(2),
-    );
-    updateGraph(randomScore);
+  useEffect(() => {
+    if (!activeNodeId) {
+      console.warn(
+        `[${bed.bed_id}] node_id가 없어 웹소켓을 연결하지 않습니다.`,
+      );
+      return;
+    }
+
+    const socket = new WebSocket(`ws://localhost:8000/ws/csi/${activeNodeId}`);
+    wsRef.current = socket;
+
+    socket.onopen = () => {
+      console.log(`✅ [${bed.bed_id}] 소켓 연결 성공 (Node: ${activeNodeId})`);
+      console.log(`연결 주소: ws://localhost:8000/ws/csi/${activeNodeId}`);
+    };
+
+    socket.onmessage = (event) => {
+      try {
+        console.log(`📩 [${activeNodeId}] 원본 메시지:`, event.data);
+
+        const data: RiskScoreMessage = JSON.parse(event.data);
+
+        if (data.type && data.type !== "RISK_SCORE") {
+          console.warn("RISK_SCORE 메시지가 아닙니다:", data);
+          return;
+        }
+
+        if (data.node_id && data.node_id !== activeNodeId) {
+          console.warn(
+            `현재 카드 node_id와 수신 node_id가 다릅니다. 카드=${activeNodeId}, 수신=${data.node_id}`,
+          );
+          return;
+        }
+
+        if (data.risk_score === undefined || data.risk_score === null) {
+          console.warn("risk_score가 없는 메시지입니다:", data);
+          return;
+        }
+
+        const newScore = Number(data.risk_score);
+
+        if (Number.isNaN(newScore)) {
+          console.warn("risk_score가 숫자가 아닙니다:", data.risk_score);
+          return;
+        }
+
+        console.log(`📈 [${activeNodeId}] 그래프 업데이트:`, newScore);
+        updateGraph(newScore);
+      } catch (e) {
+        console.error("데이터 파싱 에러:", e);
+        console.error("문제가 된 원본 데이터:", event.data);
+      }
+    };
+
+    socket.onerror = (error) => {
+      console.error(`❌ [${activeNodeId}] 웹소켓 에러:`, error);
+    };
+
+    socket.onclose = (event) => {
+      console.warn(
+        `⚠️ [${activeNodeId}] 웹소켓 종료`,
+        "code:",
+        event.code,
+        "reason:",
+        event.reason,
+      );
+    };
+
+    return () => {
+      socket.close();
+    };
+  }, [activeNodeId, bed.bed_id]);
+
+  const handleSendTestCSI = async () => {
+    try {
+      const fileRes = await fetch("/csi_test_packet_280bytes.bin");
+
+      if (!fileRes.ok) {
+        console.error("테스트 CSI 파일을 찾지 못했습니다.");
+        alert(
+          "public 폴더에 csi_test_packet_280bytes.bin 파일이 있는지 확인하세요.",
+        );
+        return;
+      }
+
+      const arrayBuffer = await fileRes.arrayBuffer();
+
+      console.log(`🚀 [${bed.bed_id}] 백엔드로 데이터 전송 중...`);
+      console.log("현재 카드 node_id:", activeNodeId);
+      console.log("전송 파일 크기:", arrayBuffer.byteLength);
+
+      const apiRes = await fetch("http://localhost:8000/csi/raw", {
+        method: "POST",
+        headers: { "Content-Type": "application/octet-stream" },
+        body: arrayBuffer,
+      });
+
+      const resultText = await apiRes.text();
+
+      if (!apiRes.ok) {
+        console.error("CSI 전송 실패:", apiRes.status, resultText);
+        alert(`CSI 전송 실패: ${apiRes.status}`);
+        return;
+      }
+
+      console.log("✅ 백엔드 전송 성공:", resultText);
+      console.log(
+        "cnn_worker가 실행 중이면 곧 WebSocket으로 risk_score가 들어와야 합니다.",
+      );
+    } catch (err) {
+      console.error("CSI 전송 중 오류:", err);
+    }
   };
 
   const isWarning = riskScore >= ALERT_THRESHOLD;
@@ -85,9 +196,9 @@ const BedCard = ({ bed }: BedCardProps) => {
           </div>
 
           <button
-            onClick={handleTestUI}
+            onClick={handleSendTestCSI}
             className="p-2 bg-gray-800 hover:bg-blue-600 rounded-lg transition-colors group"
-            title="그래프 UI 테스트"
+            title="테스트 CSI 전송"
           >
             <FiSend className="text-gray-400 group-hover:text-white" />
           </button>

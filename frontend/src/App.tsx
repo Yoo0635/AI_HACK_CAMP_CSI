@@ -1,32 +1,18 @@
-import { useState, useEffect, useRef } from "react";
-import Header from "./components/Header";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Sidebar from "./components/Sidebar";
-import BedCard from "./components/BedCard";
+import Header from "./components/Header";
 import StatsOverview from "./components/StatsOverview";
+import BedCard from "./components/BedCard";
+import AlertPopup, { type AlertData } from "./components/AlertPopup";
 
 export interface BedData {
+  id?: number;
   bed_id: string;
+  node_id: string;
   nickname: string;
   age: number;
-  node_id?: string;
+  disease: string;
 }
-
-// 웹소켓 알림 데이터 타입 정의
-export interface AlertWsMessage {
-  id?: string;
-  type?: string;
-  bed_id?: string;
-  nickname?: string;
-  risk_score?: number;
-  sllm_summary?: string;
-}
-
-const INITIAL_BEDS: BedData[] = [
-  { bed_id: "BED-101", nickname: "김환자", age: 65, node_id: "node_001" },
-  { bed_id: "BED-102", nickname: "이환자", age: 72, node_id: "node_002" },
-  { bed_id: "BED-103", nickname: "박환자", age: 58, node_id: "node_003" },
-  { bed_id: "BED-104", nickname: "최환자", age: 81, node_id: "node_004" },
-];
 
 function App() {
   const [lastUpdated, setLastUpdated] = useState<string>(
@@ -35,34 +21,73 @@ function App() {
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
 
-  const [beds, setBeds] = useState<BedData[]>(INITIAL_BEDS);
+  // 백엔드에서 불러올 병상 리스트 관리 (초기 임시 데이터 완전 제거)
+  const [beds, setBeds] = useState<BedData[]>([]);
 
-  // 실시간 알림 상태 및 웹소켓 Ref
-  const [alerts, setAlerts] = useState<AlertWsMessage[]>([]);
+  // 🌟 AlertPopup 및 실시간 그래프 데이터 스트림 상태 관리
+  const [activeAlert, setActiveAlert] = useState<AlertData | null>(null);
+  const [alertLogs, setAlertLogs] = useState<AlertData[]>([]);
+  const [nodeHistories, setNodeHistories] = useState<Record<string, number[]>>(
+    {},
+  );
+
   const wsRef = useRef<WebSocket | null>(null);
+  const HISTORY_SIZE = 20; // 그래프에 표기할 데이터 유지 개수
 
   const [newBed, setNewBed] = useState<BedData>({
     bed_id: "",
+    node_id: "",
     nickname: "",
     age: 0,
-    node_id: "",
+    disease: "",
   });
 
-  // 실시간 데이터 기반 통계 수치 동기화
+  // 실시간 통계 수치 동기화
   const totalBeds = beds.length;
-  const warningCount = alerts.length; // 들어온 알림 개수만큼 위험 카운트 증가
-  const normalCount = Math.max(0, totalBeds - warningCount);
+  const warningCount = alertLogs.length; // 누적 위험 알림 수 (Sidebar 배지 연동)
+  const normalCount = Math.max(0, totalBeds - (activeAlert ? 1 : 0));
 
-  // 웹소켓 연결 및 이벤트 리스너 설정 (컴포넌트 마운트 시 실행)
+  // 백엔드 API로부터 병상 데이터 가져오기 (Fetch)
+  const fetchBeds = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      const response = await fetch("http://localhost:8000/api/beds");
+      if (!response.ok) {
+        throw new Error("병상 데이터를 가져오는데 실패했습니다.");
+      }
+      const data = await response.json();
+
+      const bedsArray = Array.isArray(data) ? data : data.beds || [];
+
+      const formattedBeds = bedsArray.map((b: any) => ({
+        id: b.id,
+        bed_id: b.bed_id || b.bedId || "",
+        node_id: b.node_id || b.nodeId || b.nodeID || "",
+        nickname: b.nickname || "",
+        age: Number(b.age) || 0,
+        disease: b.disease || "",
+      }));
+
+      setBeds(formattedBeds);
+      setLastUpdated(new Date().toLocaleTimeString());
+    } catch (error) {
+      console.error("❌ 병상 로딩 에러:", error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, []);
+
+  // 컴포넌트 마운트 시 데이터 패치 및 웹소켓 연결
   useEffect(() => {
+    fetchBeds();
+
     const connectWebSocket = () => {
-      // 백엔드 웹소켓 주소 (환경에 맞게 포트/경로 수정 필요)
       const wsUrl = "ws://localhost:8000/ws/alerts";
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
       ws.onopen = () => {
-        console.log("🟢 [웹소켓] 대시보드 알림 서버 연결 성공");
+        console.log("🟢 [웹소켓] 대시보드 실시간 알림 채널 연결 성공");
       };
 
       ws.onmessage = (event) => {
@@ -70,12 +95,43 @@ function App() {
           const data = JSON.parse(event.data);
           console.log("📩 [웹소켓 수신]:", data);
 
-          // 위험 알림(ALERT)인 경우 화면에 표시할 alerts 배열에 추가
-          if (data.type === "ALERT" || data.risk_score >= 0.7) {
-            setAlerts((prev) => [
-              { ...data, id: Date.now().toString() }, // 고유 ID 부여
-              ...prev,
-            ]);
+          const bedId = data.bed_id || "";
+          const score =
+            typeof data.risk_score === "number"
+              ? data.risk_score
+              : parseFloat(data.risk_score) || 0;
+
+          // 1. 🌟 해당 병상(노드)의 실시간 그래프 이력 누적 업데이트
+          if (bedId) {
+            setNodeHistories((prev) => {
+              const currentHistory = prev[bedId] || Array(HISTORY_SIZE).fill(0);
+              const updatedHistory = [...currentHistory.slice(1), score];
+              return {
+                ...prev,
+                [bedId]: updatedHistory,
+              };
+            });
+          }
+
+          // 2. 🌟 위험 상황 조건 충족 시 AlertPopup 생성 트리거
+          if (data.type === "ALERT" || score >= 0.7) {
+            const newAlert: AlertData = {
+              bed_id: bedId,
+              nickname: data.nickname || "환자",
+              label: data.label || "이상 행동 감지",
+              cnn_timestamp: data.cnn_timestamp
+                ? String(data.cnn_timestamp)
+                : new Date().toLocaleTimeString(),
+              sllm_summary:
+                data.sllm_summary ||
+                "환자의 위험 실시간 행동 요소가 식별되었습니다.",
+              risk_score: score,
+            };
+
+            // 전체 알림 내역 로그에 추가
+            setAlertLogs((prev) => [newAlert, ...prev]);
+            // 현재 화면에 띄울 최신 팝업 활성화
+            setActiveAlert(newAlert);
           }
         } catch (error) {
           console.error("웹소켓 메시지 파싱 오류:", error);
@@ -83,7 +139,7 @@ function App() {
       };
 
       ws.onclose = () => {
-        console.warn("🔴 [웹소켓] 연결 끊김. 3초 후 재연결 시도...");
+        console.warn("🔴 [웹소켓] 연결 종료. 3초 후 재연결을 시도합니다...");
         setTimeout(connectWebSocket, 3000);
       };
 
@@ -95,43 +151,47 @@ function App() {
 
     connectWebSocket();
 
-    // 컴포넌트 언마운트 시 웹소켓 연결 해제
     return () => {
-      if (wsRef.current) {
-        wsRef.current.close();
-      }
+      if (wsRef.current) wsRef.current.close();
     };
-  }, []);
+  }, [fetchBeds]);
 
-  // 수신된 알림 닫기 함수
-  const handleCloseAlert = (alertId: string) => {
-    setAlerts((prev) => prev.filter((alert) => alert.id !== alertId));
-  };
-
-  const handleFetchBeds = () => {
-    setIsRefreshing(true);
-    setTimeout(() => {
-      setIsRefreshing(false);
-      setLastUpdated(new Date().toLocaleTimeString());
-    }, 1000);
-  };
-
-  const handleAddBedSubmit = (e: React.FormEvent) => {
+  // 신규 병상 등록 처리
+  const handleAddBedSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setBeds([...beds, newBed]);
-    setIsModalOpen(false);
-    setNewBed({ bed_id: "", nickname: "", age: 0, node_id: "" });
+    try {
+      const response = await fetch("http://localhost:8000/api/beds", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newBed),
+      });
+
+      if (!response.ok) {
+        throw new Error("병상 등록 실패");
+      }
+
+      setIsModalOpen(false);
+      setNewBed({ bed_id: "", node_id: "", nickname: "", age: 0, disease: "" });
+      fetchBeds();
+    } catch (error) {
+      console.error("❌ 병상 등록 에러:", error);
+      alert("병상 등록 처리 중 오류가 발생했습니다.");
+    }
   };
 
   return (
     <div className="flex h-screen bg-[#0B0E14] text-white font-sans overflow-hidden relative">
-      <Sidebar />
+      {/* 🌟 Sidebar 컴포넌트 필수 Props 데이터 매핑 (간호 일지 배지 카운트 연동) */}
+      <Sidebar
+        onOpenLogs={() => console.log("간호 일지 로그 보기 열기")}
+        logCount={warningCount}
+      />
 
       <div className="flex-1 flex flex-col h-full overflow-y-auto p-8 relative">
         <Header
           lastUpdated={lastUpdated}
           isRefreshing={isRefreshing}
-          onFetchBeds={handleFetchBeds}
+          onFetchBeds={fetchBeds}
           onAddBed={() => setIsModalOpen(true)}
         />
 
@@ -142,40 +202,35 @@ function App() {
         />
 
         <main className="flex-1">
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6">
-            {beds.map((bed, index) => (
-              <BedCard key={`${bed.bed_id}-${index}`} bed={bed} />
-            ))}
-          </div>
+          {beds.length === 0 ? (
+            <div className="text-center py-20 text-gray-500 border border-dashed border-gray-800 rounded-2xl">
+              등록된 병상이 존재하지 않습니다. 우측 상단 버튼을 통해 침대를
+              추가해 주세요.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6">
+              {beds.map((bed, index) => (
+                <BedCard key={`${bed.bed_id}-${index}`} bed={bed} />
+              ))}
+            </div>
+          )}
         </main>
       </div>
 
-      {/* 웹소켓 알림(Toast) UI 영역 */}
-      <div className="fixed top-24 right-8 z-50 flex flex-col gap-3 w-80">
-        {alerts.map((alert) => (
-          <div
-            key={alert.id}
-            className="bg-red-950/90 border border-red-500 rounded-xl p-4 shadow-[0_0_20px_rgba(239,68,68,0.3)] animate-fadeIn flex flex-col gap-2"
-          >
-            <div className="flex justify-between items-start">
-              <h3 className="text-red-400 font-bold flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
-                🚨 위험 감지: {alert.bed_id || "알 수 없음"}
-              </h3>
-              <button
-                onClick={() => handleCloseAlert(alert.id!)}
-                className="text-gray-400 hover:text-white transition"
-              >
-                ✕
-              </button>
-            </div>
-            <p className="text-sm text-gray-200">
-              {alert.sllm_summary || "환자의 이상 행동이 감지되었습니다."}
-            </p>
-          </div>
-        ))}
-      </div>
+      {/* 🌟 실시간 위험 알림 대형 팝업 (AlertPopup) 연동 완료 */}
+      {activeAlert && (
+        <AlertPopup
+          data={activeAlert}
+          riskHistory={
+            nodeHistories[activeAlert.bed_id] ||
+            Array(HISTORY_SIZE).fill(activeAlert.risk_score)
+          }
+          historySize={HISTORY_SIZE}
+          onClose={() => setActiveAlert(null)}
+        />
+      )}
 
+      {/* 신규 병상 등록 모달 */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 animate-fadeIn">
           <div className="bg-[#151821] border border-gray-700 rounded-2xl w-full max-w-md p-6 shadow-2xl">
@@ -193,6 +248,20 @@ function App() {
                   value={newBed.bed_id}
                   onChange={(e) =>
                     setNewBed({ ...newBed, bed_id: e.target.value })
+                  }
+                  className="w-full bg-[#0B0E14] border border-gray-700 rounded-lg px-4 py-2 text-white focus:border-green-500 outline-none transition"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">
+                  노드 ID (예: node_001)
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newBed.node_id}
+                  onChange={(e) =>
+                    setNewBed({ ...newBed, node_id: e.target.value })
                   }
                   className="w-full bg-[#0B0E14] border border-gray-700 rounded-lg px-4 py-2 text-white focus:border-green-500 outline-none transition"
                 />
@@ -229,13 +298,14 @@ function App() {
                 </div>
                 <div>
                   <label className="block text-xs text-gray-400 mb-1">
-                    노드 ID (선택)
+                    질환명
                   </label>
                   <input
                     type="text"
-                    value={newBed.node_id}
+                    required
+                    value={newBed.disease}
                     onChange={(e) =>
-                      setNewBed({ ...newBed, node_id: e.target.value })
+                      setNewBed({ ...newBed, disease: e.target.value })
                     }
                     className="w-full bg-[#0B0E14] border border-gray-700 rounded-lg px-4 py-2 text-white focus:border-green-500 outline-none transition"
                   />
