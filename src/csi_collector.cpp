@@ -4,6 +4,8 @@
 #include "esp_wifi.h"
 #include "freertos/queue.h"
 
+#define CSI_WIFI_CHANNEL 13
+
 static QueueHandle_t s_csi_queue = nullptr;
 
 static void csi_callback(void* ctx, wifi_csi_info_t* info) {
@@ -47,6 +49,9 @@ void csi_collector_init() {
 
     esp_wifi_set_csi_rx_cb(csi_callback, nullptr);
     esp_wifi_set_csi(true);
+
+    // Station 모드에서도 채널 명시 고정 (20MHz)
+    esp_wifi_set_channel(CSI_WIFI_CHANNEL, WIFI_SECOND_CHAN_NONE);
 }
 
 bool csi_collector_get(CsiPacket* out) {
