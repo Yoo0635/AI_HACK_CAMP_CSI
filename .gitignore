@@ -1,0 +1,5 @@
+ai/models/sllm_model.gguf
+ai/data/
+**/__pycache__/
+**/*.py[cod]
+**/.env
