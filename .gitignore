@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+
+# Virtual Environment
+venv/
+.env/
+.venv/
+
+# Environment Variables
+.env
+.env.*
+
+# IDE
+.vscode/
+.idea/
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+
+# Pytest
+.pytest_cache/
+
+# Docker
+*.pid
+
+# Node.js 부품 무시
+node_modules/
+frontend/node_modules/
+.vite/
+dist/
+
+# 파이썬 캐시, 가상환경 무시
+__pycache__/
+*.pyc
+.venv/
+venv/
