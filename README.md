@@ -29,7 +29,7 @@ ESP32-S3
 
 ```json
 {
-  "node_id":     "esp32s3-node-01",
+  "node_id":     "esp32s3-4712D0",
   "seq_num":     42,
   "csi_matrix":  [0.12, 0.34, 0.56, "..."],
   "rssi":        -65,
@@ -54,13 +54,25 @@ ESP32-S3
 ```
 firmware/
 ├─ src/
-│   ├─ main.cpp            # WiFi 연결, POST 전송 루프
-│   └─ csi_collector.cpp   # ESP-IDF CSI 콜백, Queue 처리
+│   ├─ main.cpp             # WiFi 연결, POST 전송 루프
+│   └─ csi_collector.cpp    # ESP-IDF CSI 콜백, Queue 처리
 ├─ include/
-│   ├─ config.h            # WiFi / FastAPI URL 설정
-│   └─ csi_collector.h     # CsiPacket 구조체 및 인터페이스
-└─ platformio.ini          # 보드 및 빌드 설정
+│   ├─ config.h             # 실제 설정값 (gitignore — 커밋 안됨)
+│   ├─ config.example.h     # 설정 템플릿 (복사 후 config.h로 사용)
+│   └─ csi_collector.h      # CsiPacket 구조체 및 인터페이스
+└─ platformio.ini           # 보드 및 빌드 설정
 ```
+
+### 초기 설정 방법
+
+`include/config.example.h`를 복사해 `include/config.h`로 만든 후 값 입력:
+
+| 항목 | 설명 |
+|------|------|
+| `WIFI_SSID` | 공유기 SSID |
+| `WIFI_PASSWORD` | 공유기 비밀번호 |
+| `NODE_ID` | ESP32 식별자 (공유기 장치 목록에서 확인) |
+| `FASTAPI_URL` | FastAPI 서버 주소 (예: `http://192.168.1.2:8000/csi/log`) |
 
 ---
 
@@ -86,16 +98,21 @@ firmware/
 - I/Q 원시값 → 진폭 변환 (`sqrtf(I²+Q²)`)
 - FreeRTOS Queue (크기 10) 로 메인 루프에 전달
 
----
-
 **12:45** — `src/main.cpp` 완성 (Step 2 완료)
 - WiFi 연결 및 자동 재연결 로직
 - 50ms 간격 타이밍 제어 (초당 20패킷)
 - CSI 패킷 → JSON 직렬화 → HTTP POST
 
+**12:55** — `include/config.h` 설정 완료 (Step 3 완료)
+- `config.h` gitignore 처리 (보안)
+- `config.example.h` 템플릿 추가
+- WIFI_SSID, WIFI_PASSWORD, NODE_ID, FASTAPI_URL 입력
+
 ---
 
 ## 다음 작업
 
-- [ ] Step 3: `config.h` 실제 값 입력
 - [ ] Step 4: 빌드 테스트 (`pio run`)
+- [ ] Step 5: 플래싱 (`pio run --target upload`)
+- [ ] Step 6: Serial 모니터 동작 확인 (`pio device monitor`)
+- [ ] Step 7: FastAPI 연동 테스트
