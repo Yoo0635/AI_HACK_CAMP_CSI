@@ -23,7 +23,9 @@ def main():
                 node_id = data[b"node_id"].decode()
                 seq_num = int(data[b"seq_num"])
                 csi_matrix = json.loads(data[b"csi_matrix"])
-                orchestrator.process(node_id, seq_num, csi_matrix)
+                ready = orchestrator.process(node_id, seq_num, csi_matrix)
+                if ready:
+                    print(f"[{node_id}] seq={seq_num} → analyzed", flush=True)
                 last_id = msg_id
 
 
