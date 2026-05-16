@@ -205,6 +205,7 @@ mv models/EXAONE-3.5-2.4B-Instruct-Q4_K_M.gguf models/sllm_model.gguf
 
 ## 다음 작업
 
+- [ ] `tools/data_collector.py` — 현장 학습 데이터 수집
 - [ ] `src/activity_engine/model_engine.py` — TFLite 추론 구현
 - [ ] `src/core/risk_scoring.py` — 위험도 산출 로직 구현
 - [ ] `src/summary_engine/llama_cpp_wrapper.py` — sLLM 래퍼 구현
