@@ -195,6 +195,12 @@ mv models/EXAONE-3.5-2.4B-Instruct-Q4_K_M.gguf models/sllm_model.gguf
 - Doppler 채널: `clip(diff / 5.0, -1.0, 1.0)` + 첫 프레임 zero 패딩 → (20, 64)
 - 모델 입력 shape: (1, 20, 64, 2)
 
+**14:30** — `tools/data_collector.py` 구현 완료 (현장 도착)
+- `--label NORMAL / MOVE / FALL` CLI 인자로 레이블 지정
+- `--duration` 초 동안 `csi_log_stream` 구독 후 `.npy` 저장
+- 파일명: `{LABEL}_{timestamp}_{n}samples.npy`
+- 모델 입력 shape: (1, 20, 64, 2)
+
 ---
 
 ## 다음 작업
