@@ -1,0 +1,5 @@
+tflite-runtime
+llama-cpp-python
+redis
+python-dotenv
+numpy

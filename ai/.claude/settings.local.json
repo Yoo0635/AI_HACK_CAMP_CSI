@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//d/CSI/backend//**)",
+      "Read(//d/CSI/develop//**)"
+    ]
+  }
+}
