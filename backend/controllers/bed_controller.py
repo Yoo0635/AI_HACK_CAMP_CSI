@@ -18,6 +18,7 @@ def create_bed_api(
     create_bed(request, db)
     return
 
+
 @bed_router.get("/beds", status_code=200, response_model=BedsResponse)
 def get_beds_api(
     db: Session = Depends(get_db),

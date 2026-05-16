@@ -7,8 +7,7 @@ from sqlalchemy.orm import Session
 
 from backend.config.redis_async import redis_async_client
 from backend.config.redis_streams import CSI_ANALYSIS_NAME
-from backend.entities.analysis_result import AnalysisResult
-from backend.entities.bed import Bed
+from backend.entities import Bed, AnalysisResult
 from backend.exceptions.custom_exception import (
     WebSocketDatabaseException,
     WebSocketStreamReadException,

@@ -5,10 +5,16 @@ import {
   FiFileText,
   FiPlus,
   FiSettings,
+  FiLock,
 } from "react-icons/fi";
 import { FaPills } from "react-icons/fa";
 
-const Sidebar = () => {
+interface SidebarProps {
+  onOpenLogs: () => void;
+  logCount: number;
+}
+
+const Sidebar = ({ onOpenLogs, logCount }: SidebarProps) => {
   return (
     <aside className="w-64 bg-[#0B0E14] border-r border-gray-800 flex flex-col h-screen sticky top-0 shrink-0">
       <div className="p-6 border-b border-gray-800 flex items-center gap-3">
@@ -52,14 +58,16 @@ const Sidebar = () => {
             </a>
           </li>
           <li>
-            <div className="flex items-center gap-3 px-3 py-3 text-gray-400 hover:text-white hover:bg-gray-800/50 rounded-xl transition cursor-pointer">
+            <a
+              href="#"
+              className="flex items-center gap-3 px-3 py-3 text-gray-400 hover:text-white hover:bg-gray-800/50 rounded-xl transition"
+            >
               <FaPills size={18} />
               <span className="text-sm flex-1">투약 관리</span>
-              {/* 🌟 logCount 대신 정적 숫자로 표시 */}
               <span className="w-5 h-5 bg-red-500 text-white text-[10px] flex items-center justify-center rounded-full font-bold">
                 5
               </span>
-            </div>
+            </a>
           </li>
           <li>
             <a
@@ -89,6 +97,23 @@ const Sidebar = () => {
             </a>
           </li>
         </ul>
+      </div>
+
+      <div className="p-3 border-t border-gray-800">
+        <button
+          type="button"
+          onClick={onOpenLogs}
+          className="w-full flex items-center gap-3 px-3 py-3 text-gray-300 hover:text-white hover:bg-red-500/10 border border-gray-800 hover:border-red-500/50 rounded-xl transition"
+        >
+          <FiLock size={18} className="text-red-400" />
+          <span className="text-sm flex-1 text-left">로그 내보내기</span>
+
+          {logCount > 0 && (
+            <span className="min-w-5 h-5 px-1 bg-red-500 text-white text-[10px] flex items-center justify-center rounded-full font-bold">
+              {logCount}
+            </span>
+          )}
+        </button>
       </div>
     </aside>
   );
