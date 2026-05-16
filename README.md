@@ -80,7 +80,11 @@ REDIS_PORT=6379
 
 ## 실행 방법
 
-### 1. Docker Compose
+### 1. docker compose up -d --build
+
+### 2. docker compose exec app python -m backend.workers.cnn_worker
+
+### 3. http://127.0.0.1:5173/#
 
 ```bash
 docker compose up --build
@@ -157,12 +161,8 @@ npm run dev
 - 17:20 도커 연결
 - 18:38 웹소켓 구현
 - 19:33 웹소켓 오류 완전 해결
-- 19:33위험 발생 시 대시보드 전체 알림 시스템 구축
-
-## 다음 작업
-
-- 사용자가 보기 쉽게 대시보드 꾸미기
-- 백엔드 AI 모델 분석 결과와 프론트엔드 최종 연동 테스트
+- 19:33 위험 발생 시 대시보드 전체 알림 시스템 구축
+- 20:20 간호 일지 기능 추가
 
 ## 주의사항
 
