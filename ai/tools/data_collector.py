@@ -21,7 +21,7 @@ def collect(label: str, duration: int, output_dir: str) -> None:
     last_id = "$"
     deadline = time.time() + duration
 
-    print(f"[{label}] 수집 시작 — {duration}초")
+    print(f"[{label}] 수집 시작 - {duration}초")
 
     while time.time() < deadline:
         block_ms = min(int((deadline - time.time()) * 1000), 1000)

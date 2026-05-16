@@ -200,6 +200,20 @@ mv models/EXAONE-3.5-2.4B-Instruct-Q4_K_M.gguf models/sllm_model.gguf
 - `--duration` 초 동안 `csi_log_stream` 구독 후 `.npy` 저장
 - 파일명: `{LABEL}_{timestamp}_{n}samples.npy`
 
+### 2026-05-16 (오후)
+
+**15:30** — `src/config.py` 버그 수정 및 `tools/data_collector.py` 호환성 수정
+
+**문제 1**: `data_collector.py`가 `config.py`에 없는 변수(`REDIS_HOST`, `REDIS_PORT`, `CSI_STREAM_NAME`)를 import해 `ImportError` 발생
+
+**문제 2**: `config.py`의 `CSI_STREAM` 기본값이 `"CsiLogStream"`이었으나 백엔드(`redis_streams.py`)가 쓰는 실제 스트림명은 `"csi_log_stream"`으로 불일치 → Redis에서 데이터를 읽지 못함
+
+**문제 3**: `data_collector.py`의 한글 출력에 em dash(`—`) 문자 포함 → Windows cp949 콘솔에서 `UnicodeEncodeError` 발생
+
+변경 내용:
+- `src/config.py` — `REDIS_HOST`, `REDIS_PORT` 환경변수 항목 추가; `CSI_STREAM_NAME` alias 추가; 스트림 기본값 `"CsiLogStream"` → `"csi_log_stream"` 수정
+- `tools/data_collector.py` — em dash(`—`) → 하이픈(`-`) 교체 (Windows 콘솔 호환)
+
 ---
 
 ## 다음 작업

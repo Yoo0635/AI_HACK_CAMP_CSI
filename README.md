@@ -63,8 +63,10 @@ python tools/data_collector.py --label FALL   --duration 3
 `firmware/include/config.h` 의 `FASTAPI_URL`을 노트북 IP로 설정:
 
 ```
-FASTAPI_URL = "http://<노트북_IP>:8000/csi/log"
+FASTAPI_URL = "http://<노트북_IP>:8000/csi/raw"
 ```
+
+> 엔드포인트가 `/csi/raw`임에 주의. 펌웨어는 JSON이 아닌 **280바이트 바이너리** 패킷을 전송함.
 
 ---
 
@@ -76,10 +78,28 @@ FASTAPI_URL = "http://<노트북_IP>:8000/csi/log"
 - `backend/` — FastAPI + PostgreSQL + Redis (docker-compose)
 - `ai/` — AI Worker 소스 클론
 
+**15:30** — 현장 가동 전 버그 수정 및 전체 스택 기동 확인
+
+Docker Desktop 서비스가 중지돼 있어 `docker-compose up -d --build`로 재기동:
+- `csi-postgres-server`, `csi-redis-server`, `csi-fastapi-server` 3개 컨테이너 정상 기동
+- FastAPI `/docs` (port 8000), Redis PONG 응답 확인
+
+수정된 버그 목록:
+
+| 위치 | 버그 | 수정 내용 |
+|------|------|---------|
+| `ai/src/config.py` | `REDIS_HOST`, `REDIS_PORT`, `CSI_STREAM_NAME` 변수 누락 | 변수 추가 및 `CSI_STREAM_NAME` alias 생성 |
+| `ai/src/config.py` | 스트림명 기본값 `"CsiLogStream"` ≠ 백엔드 실제값 `"csi_log_stream"` | 기본값 `"csi_log_stream"`으로 수정 |
+| `ai/tools/data_collector.py` | em dash(`—`) 문자로 Windows cp949 콘솔 `UnicodeEncodeError` | 하이픈(`-`)으로 교체 |
+| `firmware/include/config.h` | URL `/csi/log` 미존재 엔드포인트, IP `192.168.1.2` 오설정 | `/csi/raw`, IP `192.168.1.3` 수정 |
+| `firmware/include/csi_collector.h` | `CSI_MAX_LEN 128`로 백엔드 기대값(64)과 불일치 | `CSI_MAX_LEN 64`로 수정 |
+| `firmware/src/main.cpp` | JSON 전송 — 백엔드는 280바이트 바이너리만 수신 가능 | 바이너리 `BinaryPacket` 구조체 전송으로 교체 |
+
 ---
 
 ## 다음 작업
 
-- [ ] `docker-compose up` 백엔드 정상 기동 확인
-- [ ] ESP32 연결 및 `csi_log_stream` 수신 확인
+- [x] `docker-compose up` 백엔드 정상 기동 확인
+- [ ] 펌웨어 `pio run -t upload` 후 시리얼 `[OK]` 로그 확인
+- [ ] ESP32 연결 및 `csi_log_stream` 수신 확인 (`redis-cli XLEN csi_log_stream`)
 - [ ] 현장 데이터 수집 (NORMAL / MOVE / FALL)
