@@ -25,3 +25,4 @@
 
 **15시**
 - CNN Worker, CNN Analysis Model 생성
+- SLLM Worker 
