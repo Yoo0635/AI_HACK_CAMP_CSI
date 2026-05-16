@@ -1,8 +1,11 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <HTTPClient.h>
+#include <WiFiUdp.h>
 #include "config.h"
 #include "csi_collector.h"
+
+static WiFiUDP s_udp;
 
 #define LED_PIN 48
 
@@ -37,6 +40,7 @@ void setup() {
     digitalWrite(LED_PIN, LOW);
     delay(3000);
     wifi_connect();
+    s_udp.begin(1234);
     csi_collector_init();
 }
 
@@ -49,6 +53,11 @@ void loop() {
     uint32_t now = millis();
     if (now - s_last_tx_ms < 50) return;  // 20 Hz
     s_last_tx_ms = now;
+
+    // AP에 UDP 핑 → CSI 콜백 트리거
+    s_udp.beginPacket(WiFi.gatewayIP(), 1234);
+    s_udp.write(0);
+    s_udp.endPacket();
 
     CsiPacket pkt;
     if (!csi_collector_get(&pkt)) return;
