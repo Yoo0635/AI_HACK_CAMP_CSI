@@ -8,8 +8,9 @@
 - main.py 테스트
 
 **13시**
-- .env, .env.docker 생성
-- 
+- .env, .env.docker 
+- PostgreSQL Config 
+- Global Custom Exception Handler
 
 
 
