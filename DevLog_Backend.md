@@ -15,3 +15,5 @@
 - GET /beds API (beds-service-DTO-controller)
 - Redis Config
 
+**14시**
+- redis async config, redis_stream name
