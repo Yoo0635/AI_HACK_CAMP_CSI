@@ -122,6 +122,26 @@ firmware/
 - WiFi 연결 확인, CSI 수집 및 HTTP POST 전송 동작 확인
 - `POST 404` — FastAPI `/csi/log` 엔드포인트 미구현 상태, 펌웨어 자체는 정상
 
+**13:15** — 전송 상태 LED 추가
+- GPIO 48 온보드 LED, POST 전송 시 점등
+- 50ms 간격으로 깜빡이며 송신 상태 시각화
+
+**13:20** — WiFi 채널 13번 고정
+- `esp_wifi_set_channel(13, WIFI_SECOND_CHAN_NONE)` 명시적 설정
+- Station 모드 + 20MHz(HT20) 유지
+- `#define CSI_WIFI_CHANNEL 13` 상수로 관리
+
+---
+
+## WiFi 설정
+
+| 항목 | 값 |
+|------|-----|
+| 동작 모드 | Station (AP 연결) |
+| 채널 | 13번 고정 |
+| 대역폭 | 20MHz (WIFI_SECOND_CHAN_NONE) |
+| FastAPI 서버 | 192.168.1.2:8000 |
+
 ---
 
 ## 다음 작업
