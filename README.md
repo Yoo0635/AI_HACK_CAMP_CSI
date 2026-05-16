@@ -17,10 +17,17 @@ ESP32 센서가 수집한 Wi-Fi CSI 신호를 분석해 침대 이탈·움직임
 ```
 Redis csi_log_stream  (stream당 200개 / 초당 20개)
   └─ [CNN 루프 — 메인 스레드]
-       ├─ preprocessing.py     # 20샘플 슬라이딩 윈도우 → (1, 20, 64, 2)
-       ├─ model_engine.py      # TFLite CNN+LSTM 추론 → label, score, energy
-       ├─ risk_scoring.py      # 위험도 산출 → risk_score, is_anomaly
-       └─ csi_analysis_stream xadd
+       ├─ node_id == NODE001 (D0, 주 센서)
+       │    ├─ preprocessing.py     # 20샘플 슬라이딩 윈도우 → (1, 20, 64, 2)
+       │    ├─ model_engine.py      # TFLite CNN+LSTM 추론 → label, score, energy, probs
+       │    ├─ [FALL 검증] orchestrator._sensor2_had_movement()
+       │    │    ├─ True  → FALL 유지 (fall_confirmed=true)
+       │    │    └─ False/None → label=MOVE, confidence=probs[1] (강제 재분류)
+       │    ├─ risk_scoring.py      # 위험도 산출 → risk_score, is_anomaly
+       │    └─ csi_analysis_stream xadd
+       │
+       └─ node_id == NODE002 (D1, 낙상 검증 센서)
+            └─ _update_sensor2()   # 에너지 이력 deque에 적재만 (추론 없음)
 
 Redis csi_analysis_stream  (stream당 600개 / 초당 1개)
   └─ [LLM 스레드 — 데몬]
@@ -45,14 +52,17 @@ Redis csi_analysis_stream  (stream당 600개 / 초당 1개)
 
 | 구분 | 필드 | 타입 | 설명 |
 |------|------|------|------|
-| INPUT | node_id | String | 기기 식별자 |
+| INPUT | node_id | String | 기기 식별자 (NODE001만 CNN 추론, NODE002는 D1 이력 적재) |
 | INPUT | csi_matrix | list[float] | 64개 진폭값 |
-| OUTPUT | label | String | NORMAL / MOVE / FALL |
+| OUTPUT | label | String | NORMAL / MOVE / FALL (FALL은 D1 검증 후 확정) |
 | OUTPUT | cnn_score | Float | CNN 신뢰도 (0~1) |
 | OUTPUT | energy | Float | CSI 활동량 수치 |
 | OUTPUT | is_anomaly | String | "true" / "false" |
 | OUTPUT | cnn_timestamp | Integer | 분석 완료 시각 (Unix ms) |
 | OUTPUT | risk_score | Float | 위험 지수 (0~100) |
+| OUTPUT | fall_confirmed | String | "true" / "false" — D1이 FALL을 명시적으로 확인했는지 |
+| OUTPUT | d1_movement | String | "true" / "false" / "none" — D1 움직임 감지 결과 |
+| OUTPUT | d1_history_len | Integer | D1 에너지 이력 보관 프레임 수 |
 
 ### 분류 클래스 및 위험도 산출
 
@@ -73,12 +83,15 @@ is_anomaly = "true"  if risk_score > 43
 |------|---------|-------------|----------|------|
 | node_id | String | String | NOTNULL | 기기 식별자 |
 | seq_num | Integer | Int | NOTNULL | 패킷 순서 번호 |
-| label | String | String | NOTNULL | 현재 상태 판정 |
+| label | String | String | NOTNULL | 현재 상태 판정 (NORMAL / MOVE / FALL) |
 | cnn_score | Float | Float | NOTNULL | CNN 판단 확신도 |
 | energy | Float | Float | NOTNULL | 활동량 수치 |
 | is_anomaly | String | String | NOTNULL | "true" / "false" |
 | cnn_timestamp | Integer | Int | NOTNULL | CNN 분석 완료 시각 (Unix ms) |
 | risk_score | Float | Float | NOTNULL | 위험 지수 (0~100) |
+| fall_confirmed | String | String | NOTNULL | "true" / "false" — D1이 낙상 명시 확인 여부 |
+| d1_movement | String | String | NOTNULL | "true" / "false" / "none" — D1 움직임 감지 결과 |
+| d1_history_len | Integer | Int | NOTNULL | D1 에너지 이력 보관 프레임 수 |
 | sllm_summary | String | String | 조건부 | AI 요약 (is_anomaly="true" 시에만) |
 
 > stream 당 600개 보관 / 초당 1개 출력
@@ -94,6 +107,35 @@ is_anomaly = "true"  if risk_score > 43
 | INPUT | cnn_timestamp | Integer |
 | OUTPUT | sllm_summary | String |
 | OUTPUT | sllm_timestamp | Integer |
+
+### 이중 센서 낙상 검증
+
+소파 오탐 문제(소파 위 누운 상태를 FALL로 오분류)를 소프트웨어로 해결하기 위해 두 번째 센서(NODE002, D1)를 활용한 검증 로직을 도입.
+
+**동작 원리**
+
+- NODE001(D0): CNN 추론 담당. FALL 판정 시 D1 검증 요청
+- NODE002(D1): 에너지 이력만 수집. CNN 추론 없음
+
+```
+FALL 판정 시:
+  D1이 최근 5초 내 에너지 표준편차 > 0.03  → FALL 확정 (fall_confirmed=true)
+  D1이 기준 미달 또는 데이터 부족(< 5프레임) → label=MOVE 강제 재분류
+```
+
+**핵심 상수 (orchestrator.py)**
+
+| 상수 | 값 | 설명 |
+|------|----|------|
+| `FALL_CONFIRM_WINDOW_SEC` | 5.0 | FALL 판정 시 D1에서 소급 확인할 시간(초) |
+| `SENSOR2_MOVEMENT_THRESH` | 0.03 | D1 에너지 표준편차 임계값 (이상이면 움직임) |
+| `SENSOR2_HISTORY_MAXLEN` | 450 | D1 에너지 이력 최대 프레임 수 (~15초) |
+
+**재분류 로직**
+
+D1이 움직임을 명시적으로 확인(`True`)한 경우에만 FALL 유지. `False`(변동 없음) 또는 `None`(데이터 부족) 모두 MOVE로 재분류하고 `confidence=probs[1]`(MOVE softmax 확률)로 갱신.
+
+---
 
 ### 모델 정보
 
@@ -393,8 +435,32 @@ FALL 데이터 추가 수집 후 (49파일, 1,724 samples) 다양한 가중치 �
 
 ---
 
-## 다음 작업
+### 2026-05-17 (3차)
 
-- [x] 센서 위치 변경 및 데이터 전량 재수집
-- [x] FALL 감지 성공 (MOVE→FALL 전환 확인)
-- [ ] `orchestrator.py` MOVE→FALL 시간 필터 구현 (소파 오탐 제거)
+**이중 센서 낙상 검증 구현 — 소파 오탐 소프트웨어 해결**
+
+- 계획 변경: MOVE→FALL 시간 필터 → NODE002(D1) 기반 에너지 검증으로 전환
+  - 시간 필터는 빠른 동작(소파→바닥)에서 MOVE 포착 타이밍이 불확실해 신뢰도 낮음
+  - D1은 독립 경로에서 에너지 변동을 측정하므로 소파 위/바닥을 물리적으로 구분 가능
+
+**NODE001/NODE002 라우팅 (orchestrator.py)**
+- `node_id == NODE001`: CNN 추론 + D1 검증 후 `csi_analysis_stream` xadd
+- `node_id == NODE002`: 에너지 이력 deque 적재만 (`_update_sensor2`), CNN 추론 없음
+- `csi_log_stream` 단일 스트림으로 두 센서 메시지 혼재 → `node_id`로 분기
+
+**D1 낙상 검증 로직 (`_sensor2_had_movement`)**
+- 최근 `FALL_CONFIRM_WINDOW_SEC`(5초) 내 D1 에너지 프레임을 소급 조회
+- 표준편차 > `SENSOR2_MOVEMENT_THRESH`(0.03) → `True` (낙상 확정)
+- 기준 미달 → `False` (오탐), 프레임 부족(< 5개) → `None` (판단 불가)
+
+**FALL 강제 재분류**
+- D1 결과가 `False` 또는 `None`이면 `label = "MOVE"`, `confidence = probs[1]` 로 덮어씀
+- `probs`(3클래스 softmax 배열) 반환을 위해 `model_engine.predict()` 시그니처 변경
+  - 기존: `(label, confidence, energy)` → 변경: `(label, confidence, energy, probs)`
+
+**디버그 필드 추가 (`csi_analysis_stream` xadd)**
+- `fall_confirmed`: D1이 FALL을 명시적으로 확인했는지 ("true"/"false")
+- `d1_movement`: D1 검증 결과 ("true"/"false"/"none")
+- `d1_history_len`: D1 이력 보관 프레임 수 (센서 연결 확인용)
+
+---
