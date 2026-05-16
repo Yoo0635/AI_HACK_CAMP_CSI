@@ -5,8 +5,7 @@ from redis.exceptions import RedisError
 
 from backend.config.redis import redis_client
 from backend.config.redis_streams import CSI_ANALYSIS_NAME
-from backend.entities.analysis_result import AnalysisResult
-from backend.entities.bed import Bed
+from backend.entities import AnalysisResult, Bed
 from backend.exceptions.custom_exception import BedNotFoundByNodeException
 from backend.repositories.analysis_result_repository import save_analysis_result
 from backend.utils.fernet_crypto import encrypt_bytes

@@ -5,8 +5,8 @@ from sqlalchemy.orm import Session
 from backend.entities.bed import Bed
 from backend.exceptions.custom_exception import (
     BedCreateException,
-    DuplicateBedException,
     BedQueryException,
+    DuplicateBedException,
 )
 from backend.schemas.request.bed_request import BedCreateRequest
 
@@ -37,6 +37,7 @@ def create_bed(request: BedCreateRequest, db: Session) -> None:
     except SQLAlchemyError as exc:
         db.rollback()
         raise BedCreateException() from exc
+
 
 def get_beds(db: Session) -> dict[str, list[Bed]]:
     try:

@@ -1,3 +1,4 @@
+import asyncio
 import logging
 
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
@@ -7,7 +8,6 @@ from backend.config.database import get_db
 from backend.exceptions.custom_exception import WebSocketAppException
 from backend.schemas.response.csi_ws_response import WebSocketErrorResponse
 from backend.services.csi_ws_service import stream_risk_score, stream_alert
-
 
 ws_router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -25,6 +25,16 @@ async def send_websocket_error(
         ).model_dump()
     )
     await ws.close(code=exc.close_code)
+
+
+@ws_router.websocket("/ws/test")
+async def ws_test(ws: WebSocket):
+    await ws.accept()
+
+    while True:
+        await ws.send_json({"message": "websocket connected"})
+
+        await asyncio.sleep(1)
 
 
 @ws_router.websocket("/ws/csi/{node_id}")

@@ -11,9 +11,10 @@ from backend.exceptions.global_handler import register_exception_handlers
 
 app = FastAPI()
 
+# 👇 프론트엔드(React/Vite)가 접근할 수 있도록 CORS 통과 설정 추가!
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  
+    allow_origins=["*"],  # 모든 주소(포트)에서의 요청 허용 (테스트용)
     allow_credentials=True,
     allow_methods=["*"],  # GET, POST, PUT, DELETE 등 모든 메서드 허용
     allow_headers=["*"],  # 모든 헤더 허용
