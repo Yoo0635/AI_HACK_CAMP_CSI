@@ -1,14 +1,25 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <HTTPClient.h>
-#include <ArduinoJson.h>
 #include "config.h"
 #include "csi_collector.h"
 
 #define LED_PIN 48
 
-static uint32_t seq_num    = 0;
-static uint32_t last_tx_ms = 0;
+// Binary packet layout must match backend PACKET_FORMAT = "<4s8sIIi64f"
+struct __attribute__((packed)) BinaryPacket {
+    char     header[4];      // "CSI!"
+    char     node_id[8];     // null-padded node identifier
+    uint32_t detected_at;    // millis() timestamp
+    uint32_t seq_num;        // monotonic counter
+    int32_t  rssi;
+    float    csi_data[64];   // exactly 64 amplitude values
+};
+
+static_assert(sizeof(BinaryPacket) == 280, "BinaryPacket size must be 280 bytes");
+
+static uint32_t s_seq_num    = 0;
+static uint32_t s_last_tx_ms = 0;
 
 static void wifi_connect() {
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
@@ -24,48 +35,49 @@ void setup() {
     Serial.begin(115200);
     pinMode(LED_PIN, OUTPUT);
     digitalWrite(LED_PIN, LOW);
-    delay(3000);  // USB CDC 열거 대기
+    delay(3000);
     wifi_connect();
-    csi_collector_init();  // WiFi 연결 후 CSI 활성화
+    csi_collector_init();
 }
 
 void loop() {
-    // WiFi 끊기면 재연결
     if (WiFi.status() != WL_CONNECTED) {
         Serial.println("WiFi lost. Reconnecting...");
         wifi_connect();
     }
 
-    // 50ms 간격 전송 (초당 20개)
     uint32_t now = millis();
-    if (now - last_tx_ms < 50) return;
-    last_tx_ms = now;
+    if (now - s_last_tx_ms < 50) return;  // 20 Hz
+    s_last_tx_ms = now;
 
     CsiPacket pkt;
     if (!csi_collector_get(&pkt)) return;
 
-    JsonDocument doc;
-    doc["node_id"]     = NODE_ID;
-    doc["seq_num"]     = seq_num++;
-    doc["rssi"]        = pkt.rssi;
-    doc["detected_at"] = pkt.timestamp_ms;
+    BinaryPacket bin = {};
+    memcpy(bin.header, "CSI!", 4);
+    strncpy(bin.node_id, NODE_ID, sizeof(bin.node_id));
+    bin.detected_at = pkt.timestamp_ms;
+    bin.seq_num     = s_seq_num++;
+    bin.rssi        = (int32_t)pkt.rssi;
 
-    JsonArray matrix = doc["csi_matrix"].to<JsonArray>();
-    for (int i = 0; i < pkt.len; i++) {
-        matrix.add(pkt.data[i]);
+    int copy_len = (pkt.len < 64) ? pkt.len : 64;
+    for (int i = 0; i < copy_len; i++) {
+        bin.csi_data[i] = pkt.data[i];
     }
-
-    String body;
-    serializeJson(doc, body);
+    // remaining slots stay 0.0f (zero-initialised above)
 
     HTTPClient http;
     http.begin(FASTAPI_URL);
-    http.addHeader("Content-Type", "application/json");
+    http.addHeader("Content-Type", "application/octet-stream");
     digitalWrite(LED_PIN, HIGH);
-    int code = http.POST(body);
+    int code = http.POST((uint8_t*)&bin, sizeof(bin));
     digitalWrite(LED_PIN, LOW);
+
     if (code != 200) {
-        Serial.printf("[WARN] POST %d  seq=%lu\n", code, seq_num - 1);
+        Serial.printf("[WARN] POST %d  seq=%lu\n", code, s_seq_num - 1);
+    } else {
+        Serial.printf("[OK]   seq=%lu  rssi=%d  csi_len=%d\n",
+                      s_seq_num - 1, pkt.rssi, pkt.len);
     }
     http.end();
 }

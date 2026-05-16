@@ -1,7 +1,7 @@
 #pragma once
 #include <stdint.h>
 
-#define CSI_MAX_LEN 128
+#define CSI_MAX_LEN 64
 
 struct CsiPacket {
     float    data[CSI_MAX_LEN];

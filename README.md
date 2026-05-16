@@ -17,35 +17,41 @@ ESP32-S3 N16R8 보드에서 WiFi CSI(Channel State Information) 데이터를 수
 ```
 ESP32-S3
   └─ WiFi CSI 콜백 (esp_wifi_set_csi_rx_cb)
-       └─ I/Q 원시값 → 진폭(sqrtf(I²+Q²)) 변환
+       └─ I/Q 원시값 → 진폭(sqrtf(I²+Q²)) 변환 (최대 64개)
             └─ FreeRTOS Queue
-                 └─ HTTP POST → FastAPI /csi/log
-                       └─ Redis CsiLogStream
+                 └─ HTTP POST → FastAPI /csi/raw  (바이너리 280바이트)
+                       └─ Redis csi_log_stream
 ```
 
 ### FastAPI 전송 포맷
 
-엔드포인트: `POST /csi/log`
+엔드포인트: `POST /csi/raw`  
+Content-Type: `application/octet-stream`  
+크기: **280바이트 고정** (little-endian 바이너리)
 
-```json
-{
-  "node_id":     "esp32s3-4712D0",
-  "seq_num":     42,
-  "csi_matrix":  [0.12, 0.34, 0.56, "..."],
-  "rssi":        -65,
-  "detected_at": 1747382400
-}
+```
+struct BinaryPacket {
+    char     header[4];      // "CSI!"
+    char     node_id[8];     // null-padded
+    uint32_t detected_at;    // millis() 타임스탬프
+    uint32_t seq_num;        // 단조 증가 카운터
+    int32_t  rssi;
+    float    csi_data[64];   // 진폭값 정확히 64개
+};
+// static_assert(sizeof(BinaryPacket) == 280)
 ```
 
-### Redis CsiLogStream 스키마
+Python 파싱 포맷 문자열: `"<4s8sIIi64f"`
+
+### Redis csi_log_stream 스키마
 
 | 필드 | DB 타입 | Python 타입 | 제약조건 | 설명 |
 |------|---------|-------------|----------|------|
 | node_id | String | String | NOTNULL | 기기 식별자 |
 | seq_num | Integer | Int | NOTNULL | 패킷 순서 번호 |
-| csi_matrix | JSON String | list[float] | NOTNULL | 전처리 CSI 데이터 |
+| csi_matrix | JSON String | list[float] | NOTNULL | 64개 진폭값 |
 | rssi | Integer | Int | NOTNULL | 신호 세기 |
-| detected_at | Integer | Int | NOTNULL | 신호 발생 시각 |
+| detected_at | Integer | Int | NOTNULL | 신호 발생 시각 (millis) |
 
 > stream 당 200개 보관 / 초당 20개 전송
 
@@ -72,7 +78,7 @@ firmware/
 | `WIFI_SSID` | 공유기 SSID |
 | `WIFI_PASSWORD` | 공유기 비밀번호 |
 | `NODE_ID` | ESP32 식별자 (공유기 장치 목록에서 확인) |
-| `FASTAPI_URL` | FastAPI 서버 주소 (예: `http://192.168.1.2:8000/csi/log`) |
+| `FASTAPI_URL` | FastAPI 서버 주소 (예: `http://192.168.1.3:8000/csi/raw`) |
 
 ---
 
@@ -131,6 +137,20 @@ firmware/
 - Station 모드 + 20MHz(HT20) 유지
 - `#define CSI_WIFI_CHANNEL 13` 상수로 관리
 
+### 2026-05-16 (오후)
+
+**15:30** — 백엔드 바이너리 포맷에 맞게 전송 방식 전면 교체
+
+**문제**: 펌웨어가 JSON을 전송하고 있었으나 백엔드(`csi_service.py`)는 280바이트 고정 바이너리 패킷만 수신 가능
+
+변경 내용:
+- `config.h` — URL `/csi/log` → `/csi/raw`, 서버 IP `192.168.1.2` → `192.168.1.3`
+- `csi_collector.h` — `CSI_MAX_LEN` 128 → 64 (백엔드 포맷과 일치)
+- `main.cpp` — JSON 직렬화 제거, `BinaryPacket` 구조체 정의 및 `http.POST(uint8_t*, size)` 바이너리 전송으로 교체
+  - `static_assert(sizeof(BinaryPacket) == 280)` 컴파일 타임 크기 검증 추가
+  - Content-Type `application/octet-stream`으로 변경
+  - ArduinoJson 의존성 제거
+
 ---
 
 ## WiFi 설정
@@ -140,10 +160,12 @@ firmware/
 | 동작 모드 | Station (AP 연결) |
 | 채널 | 13번 고정 |
 | 대역폭 | 20MHz (WIFI_SECOND_CHAN_NONE) |
-| FastAPI 서버 | 192.168.1.2:8000 |
+| FastAPI 서버 | 192.168.1.3:8000 |
 
 ---
 
 ## 다음 작업
 
-- [ ] Step 7: FastAPI `/csi/log` 엔드포인트 구현 후 연동 테스트 (백엔드 작업)
+- [x] Step 7: FastAPI `/csi/raw` 엔드포인트 연동 (바이너리 포맷으로 펌웨어 수정 완료)
+- [ ] 플래싱 후 시리얼 모니터에서 `[OK] seq=X rssi=-XX csi_len=64` 확인
+- [ ] Redis `csi_log_stream` 수신 확인 (`docker exec csi-redis-server redis-cli XLEN csi_log_stream`)
