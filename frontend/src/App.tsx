@@ -574,7 +574,13 @@ function App() {
                   </div>
                 ) : (
                   <div className="max-h-[480px] overflow-y-auto overflow-x-auto rounded-xl border border-gray-700">
-                    <table className="w-full min-w-[1100px] table-fixed text-sm">
+                    <table
+                      className={`w-full table-fixed text-sm ${
+                        logModalMode === "nursing"
+                          ? "min-w-[1100px]"
+                          : "min-w-[760px]"
+                      }`}
+                    >
                       <thead className="sticky top-0 bg-[#0B0E14] text-gray-400">
                         <tr>
                           <th className="w-[130px] text-left px-4 py-3">
@@ -588,10 +594,17 @@ function App() {
                           <th className="w-[260px] text-left px-4 py-3">
                             LLM 결과값
                           </th>
-                          <th className="w-[360px] text-left px-4 py-3">
-                            간호내용
-                          </th>
-                          <th className="w-[90px] text-left px-4 py-3">저장</th>
+
+                          {logModalMode === "nursing" && (
+                            <>
+                              <th className="w-[360px] text-left px-4 py-3">
+                                간호내용
+                              </th>
+                              <th className="w-[90px] text-left px-4 py-3">
+                                저장
+                              </th>
+                            </>
+                          )}
                         </tr>
                       </thead>
 
@@ -625,34 +638,40 @@ function App() {
                                 {log.sllm_summary || "LLM 결과값 없음"}
                               </td>
 
-                              <td className="px-4 py-3">
-                                <textarea
-                                  value={draftValue}
-                                  onChange={(e) =>
-                                    handleNursingNoteChange(
-                                      log.id,
-                                      e.target.value,
-                                    )
-                                  }
-                                  placeholder="간호내용을 입력하세요."
-                                  className="w-full min-h-[80px] resize-y bg-[#0B0E14] border border-gray-700 rounded-lg px-3 py-2 text-gray-200 focus:border-green-500 outline-none"
-                                />
-                                {log.nursing_note && (
-                                  <p className="text-[11px] text-green-400 mt-1">
-                                    저장된 내용 있음
-                                  </p>
-                                )}
-                              </td>
+                              {logModalMode === "nursing" && (
+                                <>
+                                  <td className="px-4 py-3">
+                                    <textarea
+                                      value={draftValue}
+                                      onChange={(e) =>
+                                        handleNursingNoteChange(
+                                          log.id,
+                                          e.target.value,
+                                        )
+                                      }
+                                      placeholder="간호내용을 입력하세요."
+                                      className="w-full min-h-[80px] resize-y bg-[#0B0E14] border border-gray-700 rounded-lg px-3 py-2 text-gray-200 focus:border-green-500 outline-none"
+                                    />
+                                    {log.nursing_note && (
+                                      <p className="text-[11px] text-green-400 mt-1">
+                                        저장된 내용 있음
+                                      </p>
+                                    )}
+                                  </td>
 
-                              <td className="px-4 py-3">
-                                <button
-                                  type="button"
-                                  onClick={() => handleSaveNursingNote(log.id)}
-                                  className="px-3 py-2 bg-green-500 text-black text-xs font-bold rounded-lg hover:bg-green-400 transition"
-                                >
-                                  저장
-                                </button>
-                              </td>
+                                  <td className="px-4 py-3">
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        handleSaveNursingNote(log.id)
+                                      }
+                                      className="px-3 py-2 bg-green-500 text-black text-xs font-bold rounded-lg hover:bg-green-400 transition"
+                                    >
+                                      저장
+                                    </button>
+                                  </td>
+                                </>
+                              )}
                             </tr>
                           );
                         })}
