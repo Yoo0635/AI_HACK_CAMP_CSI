@@ -68,6 +68,14 @@ def run_sllm_worker() -> None:
                     last_id = message_id
                     continue
 
+                try:
+                    risk_score_val = float(fields.get("risk_score", 0))
+                except (ValueError, TypeError):
+                    risk_score_val = 0.0
+                if risk_score_val < 80.1:
+                    last_id = message_id
+                    continue
+
                 node_id = str(fields.get("node_id", ""))
                 now = time.time()
                 if now - last_summary_time.get(node_id, 0) < COOLDOWN_SEC:

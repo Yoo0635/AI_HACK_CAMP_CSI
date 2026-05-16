@@ -1,5 +1,8 @@
+import threading
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware  # 👉 CORS 미들웨어 추가!
+from fastapi.middleware.cors import CORSMiddleware
 
 from backend.controllers.bed_controller import bed_router
 from backend.controllers.csi_controller import csi_router
@@ -8,8 +11,17 @@ from backend.config.database import Base, engine
 from backend.config.redis import redis_client
 from backend.config.redis_streams import CSI_LOG_NAME
 from backend.exceptions.global_handler import register_exception_handlers
+from backend.workers.sllm_worker import run_sllm_worker
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    t = threading.Thread(target=run_sllm_worker, daemon=True)
+    t.start()
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 # 👇 프론트엔드(React/Vite)가 접근할 수 있도록 CORS 통과 설정 추가!
 app.add_middleware(
