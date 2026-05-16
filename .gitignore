@@ -1,0 +1,5 @@
+# Node.js 부품 무시
+node_modules/
+frontend/node_modules/
+.vite/
+dist/
