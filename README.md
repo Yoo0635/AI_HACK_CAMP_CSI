@@ -262,15 +262,21 @@ mv models/EXAONE-3.5-2.4B-Instruct-Q4_K_M.gguf models/sllm_model.gguf
 - `is_anomaly = risk_score > 43`
 - 기본점수: NORMAL 20 / MOVE 65 / FALL 85 (상수로 분리, 테스트 후 조정 가능)
 
-**20:xx** — `src/core/orchestrator.py` 구현 완료
+**20:20** — `src/core/orchestrator.py` 구현 완료
 - `process(node_id, seq_num, csi_matrix)` → Preprocessor → ActivityEngine → compute_risk → xadd
 - 윈도우 미달 시 False 반환 (20프레임 쌓일 때까지 스킵)
 - `csi_analysis_stream` xadd (maxlen=600)
 
 ---
 
+**20:30** — `src/summary_engine/llama_cpp_wrapper.py` 구현 완료
+- EXAONE GGUF 모델 로드 (`llama_cpp`, n_ctx=512, n_threads=4)
+- `summarize(label, cnn_score, risk_score, energy)` → 한국어 2문장 요약
+- 프롬프트: 감지 상태·신뢰도·위험지수·에너지 → temperature=0.3, max_tokens=128
+
+---
+
 ## 다음 작업
 
-- [ ] `src/summary_engine/llama_cpp_wrapper.py` — sLLM 래퍼 구현
 - [ ] `src/worker.py` — Redis 데몬 구현 (CNN 메인스레드 + LLM 데몬스레드)
 - [ ] `tools/test_local.py` — 로컬 추론 테스트
