@@ -159,6 +159,28 @@ ai/
 | `TFLITE_MODEL_PATH` | `models/activity_cnn_int8.tflite` | TFLite 모델 경로 |
 | `GGUF_MODEL_PATH` | `models/sllm_model.gguf` | sLLM 모델 경로 |
 
+### 데이터 수집
+
+먼저 실행 → 그 다음 동작 재현 (수집기가 돌아가는 동안 행동):
+
+```bash
+python tools/data_collector.py --label NORMAL --duration 3
+python tools/data_collector.py --label MOVE   --duration 3
+python tools/data_collector.py --label FALL   --duration 3
+```
+
+#### 학습 목표 샘플 수
+
+3초 수집 1회 = 약 60개 raw 샘플 (20패킷/초 × 3초)
+
+| 클래스 | 최소 수집 횟수 | 목표 샘플 수 | 비고 |
+|--------|--------------|-------------|------|
+| NORMAL | 50회 이상 | 3,000개+ | 정지 상태 다양한 자세 |
+| MOVE | 50회 이상 | 3,000개+ | 뒤척임·움직임 반복 |
+| FALL | 30회 이상 | 1,800개+ | 침대 이탈 동작 반복 재현 |
+
+> 현장 환경이 바뀌면 반드시 해당 환경에서 재수집 후 재학습 — CSI 패턴은 센서 위치·공간 구조에 따라 크게 달라짐
+
 sLLM 모델 다운로드:
 
 ```bash
