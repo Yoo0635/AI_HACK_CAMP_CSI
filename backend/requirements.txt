@@ -13,6 +13,7 @@ psycopg2-binary
 redis
 
 httpx
+prometheus-fastapi-instrumentator
 
 numpy
 pandas

@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware  # 👉 CORS 미들웨어 추가!
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from backend.controllers.bed_controller import bed_router
 from backend.controllers.csi_controller import csi_router
@@ -10,6 +11,7 @@ from backend.config.redis_streams import CSI_LOG_NAME
 from backend.exceptions.global_handler import register_exception_handlers
 
 app = FastAPI()
+Instrumentator().instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
 
 # 👇 프론트엔드(React/Vite)가 접근할 수 있도록 CORS 통과 설정 추가!
 app.add_middleware(
